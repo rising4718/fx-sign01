@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import Chart from './components/Chart';
+import LogicManagement from './components/LogicManagement';
 import './App.css';
 
 function AppWithChart() {
   const [currentPrice, setCurrentPrice] = useState(150.123);
   const [chartData, setChartData] = useState([]);
   const [lastCandleSwitch, setLastCandleSwitch] = useState<Date | null>(null);
+  const [activeTab, setActiveTab] = useState<'chart' | 'logic'>('chart');
 
   useEffect(() => {
     let basePrice = 150.0;
@@ -131,35 +133,56 @@ function AppWithChart() {
           <span className="price">{currentPrice}</span>
         </div>
       </header>
+
+      <nav className="tab-nav">
+        <button 
+          className={`tab-btn ${activeTab === 'chart' ? 'active' : ''}`}
+          onClick={() => setActiveTab('chart')}
+        >
+          📈 チャート
+        </button>
+        <button 
+          className={`tab-btn ${activeTab === 'logic' ? 'active' : ''}`}
+          onClick={() => setActiveTab('logic')}
+        >
+          ⚙️ ロジック管理
+        </button>
+      </nav>
       
       <main className="main-content">
-        <div className="chart-section">
-          <Chart data={chartData} width={1000} height={500} />
-        </div>
-        
-        <div className="info-panel">
-          <div className="torb-section">
-            <h4>TORB レンジ状況</h4>
-            <p>チャートデータ: {chartData.length} 本</p>
-            <p>ステータス: TORB統合準備完了</p>
-          </div>
-          
-          <div className="torb-section">
-            <h4>シグナル状況</h4>
-            <p>アクティブなシグナルなし</p>
-          </div>
+        {activeTab === 'chart' ? (
+          <>
+            <div className="chart-section">
+              <Chart data={chartData} width={1000} height={500} />
+            </div>
+            
+            <div className="info-panel">
+              <div className="torb-section">
+                <h4>TORB レンジ状況</h4>
+                <p>チャートデータ: {chartData.length} 本</p>
+                <p>ステータス: TORB統合準備完了</p>
+              </div>
+              
+              <div className="torb-section">
+                <h4>シグナル状況</h4>
+                <p>アクティブなシグナルなし</p>
+              </div>
 
-          <div className="torb-section">
-            <h4>デバッグ情報</h4>
-            <p>現在時刻: {new Date().toLocaleTimeString('ja-JP')}</p>
-            {lastCandleSwitch && (
-              <p>最後の足切替: {lastCandleSwitch.toLocaleTimeString('ja-JP')}</p>
-            )}
-            {chartData.length > 0 && (
-              <p>現在の足時刻: {new Date(chartData[chartData.length - 1].time * 1000).toLocaleTimeString('ja-JP')}</p>
-            )}
-          </div>
-        </div>
+              <div className="torb-section">
+                <h4>デバッグ情報</h4>
+                <p>現在時刻: {new Date().toLocaleTimeString('ja-JP')}</p>
+                {lastCandleSwitch && (
+                  <p>最後の足切替: {lastCandleSwitch.toLocaleTimeString('ja-JP')}</p>
+                )}
+                {chartData.length > 0 && (
+                  <p>現在の足時刻: {new Date(chartData[chartData.length - 1].time * 1000).toLocaleTimeString('ja-JP')}</p>
+                )}
+              </div>
+            </div>
+          </>
+        ) : (
+          <LogicManagement />
+        )}
       </main>
     </div>
   );
