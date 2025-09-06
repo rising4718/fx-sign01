@@ -1,3 +1,4 @@
+import Header from "./components/Header";
 import React, { useState, useEffect } from 'react';
 import Chart from './components/Chart';
 import './App.css';
@@ -70,20 +71,16 @@ function AppWithMock() {
 
   return (
     <div className="app">
-      <header className="app-header">
-        <h1>FX Sign Tool - Phase 2</h1>
-        <div className="market-info">
-          <span>USD/JPY</span>
-          <span className="price">{currentPrice}</span>
-          <span className={`change ${change >= 0 ? 'positive' : 'negative'}`}>
-            {change >= 0 ? '+' : ''}{change.toFixed(3)}
-            ({((change / currentPrice) * 100).toFixed(2)}%)
-          </span>
-        </div>
-        <div className="error-message">
-          Using mock data - External API disabled
-        </div>
-      </header>
+      <Header 
+        currentPrice={{
+          symbol: 'USDJPY',
+          price: currentPrice,
+          change: change,
+          changePercent: (change / currentPrice) * 100,
+          timestamp: new Date().toISOString()
+        }}
+        error="Using mock data - External API disabled"
+      />
       
       <main className="main-content">
         <div className="chart-section">

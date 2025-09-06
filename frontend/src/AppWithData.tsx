@@ -1,3 +1,4 @@
+import Header from "./components/Header";
 import React from 'react';
 import Chart from './components/Chart';
 import { useFxData } from './hooks/useFxData';
@@ -17,26 +18,7 @@ function AppWithData() {
 
   return (
     <div className="app">
-      <header className="app-header">
-        <h1>FX Sign Tool - Phase 2</h1>
-        <div className="market-info">
-          <span>USD/JPY</span>
-          <span className="price">
-            {currentPrice ? currentPrice.price.toFixed(3) : 'Loading...'}
-          </span>
-          {currentPrice && (
-            <span className={`change ${currentPrice.change >= 0 ? 'positive' : 'negative'}`}>
-              {currentPrice.change >= 0 ? '+' : ''}{currentPrice.change.toFixed(3)}
-              ({currentPrice.changePercent >= 0 ? '+' : ''}{currentPrice.changePercent.toFixed(2)}%)
-            </span>
-          )}
-        </div>
-        {error && (
-          <div className="error-message">
-            {error} - Using mock data
-          </div>
-        )}
-      </header>
+      <Header currentPrice={currentPrice} error={error} />
       
       <main className="main-content">
         <div className="chart-section">

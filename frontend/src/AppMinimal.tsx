@@ -1,16 +1,11 @@
+import Header from "./components/Header";
 import React from 'react';
 import './App.css';
 
 function AppMinimal() {
   return (
     <div className="app">
-      <header className="app-header">
-        <h1>FX Sign Tool - Phase 2</h1>
-        <div className="market-info">
-          <span>USD/JPY</span>
-          <span className="price">150.000</span>
-        </div>
-      </header>
+      <Header />
       
       <main className="main-content">
         <div className="chart-section">

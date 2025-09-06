@@ -5,6 +5,7 @@ import Chart from './components/Chart';
 import LogicManagement from './components/LogicManagement';
 import TradingResults from './components/TradingResults';
 import FundManagement from './components/FundManagement';
+import AntHeader from './components/AntHeader';
 import 'antd/dist/reset.css';
 import './App.css';
 
@@ -555,32 +556,7 @@ function AppWithChart() {
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Header style={{ 
-        background: 'linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)',
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'space-between',
-        padding: '0 24px'
-      }}>
-        <div>
-          <Title level={2} style={{ color: 'white', margin: 0 }}>
-            FX Sign Tool - Phase 2
-          </Title>
-        </div>
-        
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <Text style={{ color: 'white', fontSize: '16px' }}>USD/JPY</Text>
-          <Statistic
-            value={currentPrice}
-            precision={3}
-            valueStyle={{ 
-              color: 'white', 
-              fontSize: '24px', 
-              fontFamily: 'Monaco, Menlo, monospace' 
-            }}
-          />
-        </div>
-      </Header>
+      <AntHeader currentPrice={currentPrice} />
 
       <Content style={{ padding: '24px', background: '#f5f5f5' }}>
         <Tabs

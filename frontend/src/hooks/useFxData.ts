@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { CandlestickData } from 'lightweight-charts';
-import { MarketData } from '../types';
+import type { MarketData } from '../types';
 import { fxApiService } from '../services/fxApi';
 import { generateTORBMockData, generateNextCandle } from '../utils/mockData';
 

@@ -1,3 +1,4 @@
+import Header from "./components/Header";
 import React, { useState, useEffect } from 'react';
 import './App.css';
 
@@ -29,13 +30,15 @@ function AppNoChart() {
   console.log('Rendering main app');
   return (
     <div className="app">
-      <header className="app-header">
-        <h1>FX Sign Tool - Phase 2</h1>
-        <div className="market-info">
-          <span>USD/JPY</span>
-          <span className="price">{currentPrice}</span>
-        </div>
-      </header>
+      <Header 
+        currentPrice={{
+          symbol: 'USDJPY',
+          price: currentPrice,
+          change: 0,
+          changePercent: 0,
+          timestamp: new Date().toISOString()
+        }}
+      />
       
       <main className="main-content">
         <div className="chart-section">

@@ -1,5 +1,5 @@
 import type { CandlestickData } from 'lightweight-charts';
-import { OHLCData } from '../types';
+import type { OHLCData } from '../types';
 
 // モックデータ生成関数
 export const generateMockOHLCData = (

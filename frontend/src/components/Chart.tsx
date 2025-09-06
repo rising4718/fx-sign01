@@ -15,7 +15,7 @@ interface ChartProps {
   height?: number;
 }
 
-const Chart: React.FC<ChartProps> = ({ data, width = 800, height = 400 }) => {
+const Chart: React.FC<ChartProps> = ({ data, width = 1000, height = 400 }) => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
@@ -73,7 +73,7 @@ const Chart: React.FC<ChartProps> = ({ data, width = 800, height = 400 }) => {
     
     // 価格軸ラベル
     ctx.fillStyle = '#ffffff';
-    ctx.font = '12px monospace';
+    ctx.font = '100 10px monospace';
     ctx.textAlign = 'right';
     for (let i = 0; i <= 5; i++) {
       const price = maxPrice + padding - (priceRange + padding * 2) / 5 * i;
@@ -134,7 +134,7 @@ const Chart: React.FC<ChartProps> = ({ data, width = 800, height = 400 }) => {
       
       // 価格ラベルの背景ボックス
       const labelText = lastCandle.close.toFixed(3);
-      ctx.font = '12px monospace';
+      ctx.font = '100 10px monospace';
       ctx.textAlign = 'left';
       const labelWidth = ctx.measureText(labelText).width + 8;
       const labelHeight = 18;
@@ -160,11 +160,6 @@ const Chart: React.FC<ChartProps> = ({ data, width = 800, height = 400 }) => {
       ctx.setLineDash([]);
     }
     
-    // タイトル
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '16px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('📊 USD/JPY 15分足チャート', width / 2, 25);
     
     
     console.log('Canvas chart drawn successfully');
@@ -172,9 +167,6 @@ const Chart: React.FC<ChartProps> = ({ data, width = 800, height = 400 }) => {
   
   return (
     <div className="chart-container">
-      <div className="chart-header">
-        <h3>USD/JPY - 15分足</h3>
-      </div>
       <div 
         ref={chartContainerRef}
         style={{ 
