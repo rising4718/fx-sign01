@@ -11,7 +11,7 @@ USD/JPYデイトレード用のサインツールで、東京時間（9:00-11:00
 1. **基本チャート表示**
    - TradingView Lightweight Charts使用
    - USD/JPY 15分足表示
-   - リアルタイム価格更新（30秒間隔）
+   - リアルタイム価格更新（1秒間隔）
 
 2. **FX APIサービス**
    - FreeForexAPI統合
@@ -48,23 +48,45 @@ USD/JPYデイトレード用のサインツールで、東京時間（9:00-11:00
 ## プロジェクト構造
 
 ```
-frontend/
-├── src/
-│   ├── components/
-│   │   ├── Chart.tsx          # メインチャートコンポーネント
-│   │   └── TORBPanel.tsx      # TORB情報パネル
-│   ├── hooks/
-│   │   ├── useFxData.ts       # FXデータ管理フック
-│   │   └── useTORBAnalysis.ts # TORB分析フック
-│   ├── services/
-│   │   └── fxApi.ts           # FX API サービス
-│   ├── utils/
-│   │   ├── mockData.ts        # モックデータ生成
-│   │   └── torbLogic.ts       # TORB戦略ロジック
-│   ├── types/
-│   │   └── index.ts           # TypeScript型定義
-│   └── App.tsx                # メインアプリケーション
-└── package.json
+fx-sign01/
+├── frontend/                  # React フロントエンド
+│   ├── src/
+│   │   ├── pages/            # ページコンポーネント
+│   │   │   ├── TORBLandingPage.tsx
+│   │   │   ├── TradingPage.tsx
+│   │   │   ├── TORBLogicPage.tsx
+│   │   │   ├── FundManagementPage.tsx
+│   │   │   └── ResultsPage.tsx
+│   │   ├── components/       # 再利用可能コンポーネント
+│   │   │   ├── Chart.tsx     # メインチャート
+│   │   │   ├── TORBPanel.tsx # TORB情報パネル
+│   │   │   ├── Header.tsx    # ナビゲーション
+│   │   │   └── ...
+│   │   ├── hooks/           # カスタムフック
+│   │   │   ├── useFxData.ts
+│   │   │   ├── useTORBAnalysis.ts
+│   │   │   └── usePatternAnalysis.ts
+│   │   ├── services/        # API接続サービス
+│   │   │   └── fxApi.ts
+│   │   └── utils/           # ユーティリティ
+│   └── package.json
+├── backend/                 # Node.js バックエンド (Phase 2で追加)
+│   ├── src/
+│   │   ├── routes/          # API ルート
+│   │   │   ├── fx.ts
+│   │   │   └── torb.ts
+│   │   ├── services/        # ビジネスロジック
+│   │   │   ├── fxDataService.ts
+│   │   │   └── torbAnalysisService.ts
+│   │   ├── models/          # データベースモデル
+│   │   ├── middleware/      # Express ミドルウェア
+│   │   └── server.ts        # サーバーエントリーポイント
+│   ├── package.json
+│   └── tsconfig.json
+└── docs/                    # ドキュメント
+    ├── API.md
+    ├── DEPLOYMENT.md
+    └── ARCHITECTURE.md
 ```
 
 ## 開発・起動方法
@@ -114,7 +136,7 @@ npm run preview
 
 - **メイン**: FreeForexAPI (無料枠)
 - **レート制限**: 制限なし（現在）
-- **更新頻度**: 30秒間隔
+- **更新頻度**: 1秒間隔
 - **フォールバック**: モックデータ
 
 ## Phase 2 予定機能

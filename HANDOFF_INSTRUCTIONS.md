@@ -47,7 +47,7 @@ frontend/src/
 
 ### 📋 Phase 1 完成状況
 - [x] 基本チャート表示 (TradingView Lightweight Charts v5.0.8)
-- [x] リアルタイムUSD/JPY価格更新 (30秒間隔)  
+- [x] リアルタイムUSD/JPY価格更新 (1秒間隔)  
 - [x] TORB戦略実装 (東京時間9:00-11:00対応)
 - [x] RSI(14)フィルター
 - [x] P&L計算とシグナル表示

@@ -42,8 +42,9 @@ FX Sign Tool - 東京時間特化型サインツール
 - **時間足**：15分足（メイン）、5分足（補助）
 
 ### 3.3 データソース
-- FX価格データAPI（OANDA/Alpha Vantage等）
-- リアルタイムまたは1分更新
+- GMOコインFX API（メイン）
+- Alpha Vantage API（フォールバック）
+- リアルタイム1秒更新
 
 ## 4. Phase 1: TORB機能仕様
 
@@ -111,22 +112,62 @@ FX Sign Tool - 東京時間特化型サインツール
 ## 6. 技術仕様
 
 ### 6.1 フロントエンド
-- **言語**：JavaScript/TypeScript
-- **フレームワーク**：React または Vue.js
-- **チャートライブラリ**：Chart.js または TradingView
+- **言語**：TypeScript
+- **フレームワーク**：React 19
+- **チャートライブラリ**：TradingView Lightweight Charts v5.0.8
+- **UI ライブラリ**：Ant Design 5.27.2
+- **ルーティング**：React Router DOM 7.8.2
+- **ビルドツール**：Vite 7.1.2
 
 ### 6.2 バックエンド
-- **言語**：Node.js/Python
+- **言語**：Node.js + TypeScript
+- **フレームワーク**：Express.js
 - **API**：REST API
-- **リアルタイム通信**：WebSocket
+- **リアルタイム通信**：WebSocket (ws library)
+- **認証・セッション管理**：JWT + Redis
+- **API レート制限**：express-rate-limit
 
 ### 6.3 データベース
-- **価格データ**：PostgreSQL/MongoDB
-- **パターンデータ**：時系列データ対応DB
+- **価格データ**：PostgreSQL (TimescaleDB拡張)
+- **キャッシュ・セッション**：Redis
+- **パターンデータ**：PostgreSQL (JSONB型)
 
 ### 6.4 外部API
-- FX価格データ取得API
-- 経済指標カレンダーAPI
+- **メイン**: GMOコインFX API (完全無料)
+- **フォールバック**: Alpha Vantage API (無料枠)
+- **経済指標**: 経済指標カレンダーAPI (Phase 3)
+
+### 6.5 バックエンドアーキテクチャ詳細
+
+#### API エンドポイント設計
+```
+/api/v1/fx/
+├── ticker          # リアルタイム価格取得
+├── historical      # 過去データ取得
+└── patterns        # パターン分析結果
+
+/api/v1/torb/
+├── signals         # TORBシグナル取得
+├── analysis        # TORB分析結果
+└── history         # 過去の取引履歴
+
+/ws/                # WebSocket接続
+├── price-feed      # リアルタイム価格配信
+└── signal-alerts   # シグナル通知
+```
+
+#### データフロー
+```
+GMO API → Backend Cache → WebSocket → Frontend Chart
+    ↓
+PostgreSQL (履歴保存) → パターン分析 → 予測結果
+```
+
+#### パフォーマンス要件
+- **API応答時間**: < 100ms
+- **WebSocket遅延**: < 50ms  
+- **データ更新頻度**: 1秒間隔
+- **同時接続数**: 100ユーザー (初期)
 
 ## 7. UI/UX仕様
 
