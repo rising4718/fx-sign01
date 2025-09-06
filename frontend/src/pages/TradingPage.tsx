@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Layout, Tabs, Card, Row, Col, Typography, Tag, Space } from 'antd';
 import Chart from '../components/Chart';
+import DualChart from '../components/DualChart';
 import AntHeader from '../components/AntHeader';
+import { fxApiService } from '../services/fxApi';
 
 const { Content } = Layout;
 const { Title, Text } = Typography;
@@ -9,6 +11,7 @@ const { Title, Text } = Typography;
 const TradingPage: React.FC = () => {
   const [currentPrice, setCurrentPrice] = useState<number>(150.123);
   const [chartData, setChartData] = useState<any[]>([]);
+  const [detailChartData, setDetailChartData] = useState<any[]>([]);
   const [currentRange, setCurrentRange] = useState<{ high: number; low: number; width: number } | null>(null);
   const [activeSignal, setActiveSignal] = useState<any>(null);
   const [signalHistory, setSignalHistory] = useState<any[]>([]);
@@ -21,6 +24,17 @@ const TradingPage: React.FC = () => {
     return saved ? JSON.parse(saved) : {};
   });
   const [lastCandleSwitch, setLastCandleSwitch] = useState<Date | null>(null);
+
+  // セッション情報を取得する関数
+  const getCurrentSession = () => {
+    const jst = new Date(new Date().getTime() + (9 * 60 * 60 * 1000));
+    const hour = jst.getHours();
+    
+    if (hour >= 9 && hour < 15) return { name: '東京', color: '#52c41a' };
+    if (hour >= 16 && hour < 24) return { name: 'ロンドン', color: '#1890ff' };
+    if (hour >= 22 || hour < 2) return { name: 'NY序盤', color: '#fa8c16' };
+    return { name: 'オフ', color: '#8c8c8c' };
+  };
   
   // TORBロジック設定（ローカルストレージから取得）
   const [torbSettings, setTorbSettings] = useState(() => {
@@ -398,12 +412,67 @@ const TradingPage: React.FC = () => {
     setChartData(initialData);
     setCurrentPrice(initialData[initialData.length - 1]?.close || 150.123);
     
+    // 5分足データ取得（12本）
+    const generate5MinData = () => {
+      const data = [];
+      let detailPrice = basePrice;
+      
+      for (let i = 11; i >= 0; i--) {
+        const candleDate = new Date(currentCandleStart.getTime() - i * 5 * 60 * 1000);
+        const candleTime = Math.floor(candleDate.getTime() / 1000);
+        const change = (Math.random() - 0.5) * 0.002;
+        
+        const open = detailPrice;
+        const close = detailPrice + change;
+        const high = Math.max(open, close) + Math.random() * 0.001;
+        const low = Math.min(open, close) - Math.random() * 0.001;
+        
+        data.push({
+          time: candleTime,
+          open: Number(open.toFixed(3)),
+          high: Number(high.toFixed(3)),
+          low: Number(low.toFixed(3)),
+          close: Number(close.toFixed(3))
+        });
+        
+        detailPrice = close;
+      }
+      return data;
+    };
+
+    const detail5MinData = generate5MinData();
+    setDetailChartData(detail5MinData);
+    
     // 初期TORB計算
     calculateRange(initialData);
 
     // 1秒ごとに現在のローソク足を更新（リアルタイム価格変動）
     const interval = setInterval(() => {
-      setChartData(prevData => updateCurrentCandle(prevData));
+      setChartData(prevData => {
+        const updatedData = updateCurrentCandle(prevData);
+        
+        // 5分足データも同期して更新
+        if (updatedData.length > 0) {
+          const latestPrice = updatedData[updatedData.length - 1].close;
+          setDetailChartData(prevDetailData => {
+            const newDetailData = [...prevDetailData];
+            if (newDetailData.length > 0) {
+              const lastDetailCandle = newDetailData[newDetailData.length - 1];
+              
+              // 最後の5分足も現在価格で更新
+              newDetailData[newDetailData.length - 1] = {
+                ...lastDetailCandle,
+                high: Math.max(lastDetailCandle.high, latestPrice),
+                low: Math.min(lastDetailCandle.low, latestPrice),
+                close: latestPrice
+              };
+            }
+            return newDetailData;
+          });
+        }
+        
+        return updatedData;
+      });
     }, 1000);
 
     return () => clearInterval(interval);
@@ -419,217 +488,186 @@ const TradingPage: React.FC = () => {
       ),
       children: (
         <Row gutter={[24, 24]}>
-          <Col xs={24} lg={16}>
-            <Card style={{ height: '600px' }}>
-              <Chart data={chartData} width={1000} height={500} />
+          <Col xs={24}>
+            <Card style={{ height: '600px', backgroundColor: '#141414' }}>
+              <DualChart 
+                mainData={chartData}
+                detailData={detailChartData}
+                currentPrice={currentPrice}
+                torbRange={currentRange}
+                signals={signalHistory}
+              />
             </Card>
           </Col>
-          <Col xs={24} lg={8}>
-            <Space direction="vertical" style={{ width: '100%' }} size="large">
-              <Card title="TORB レンジ情報">
+          <Col xs={24}>
+            <Row gutter={[16, 16]}>
+              <Col xs={24} sm={6}>
+                <Card bodyStyle={{ padding: '12px' }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <Text type="secondary" style={{ fontSize: '12px' }}>今日のシグナル数</Text>
+                    <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#1890ff' }}>
+                      {(() => {
+                        const today = new Date().toLocaleDateString('ja-JP');
+                        return dailyStats[today]?.totalSignals || 0;
+                      })()}
+                    </div>
+                  </div>
+                </Card>
+              </Col>
+              <Col xs={24} sm={6}>
+                <Card bodyStyle={{ padding: '12px' }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <Text type="secondary" style={{ fontSize: '12px' }}>勝利数</Text>
+                    <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#52c41a' }}>
+                      {(() => {
+                        const today = new Date().toLocaleDateString('ja-JP');
+                        return dailyStats[today]?.wins || 0;
+                      })()}
+                    </div>
+                  </div>
+                </Card>
+              </Col>
+              <Col xs={24} sm={6}>
+                <Card bodyStyle={{ padding: '12px' }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <Text type="secondary" style={{ fontSize: '12px' }}>敗北数</Text>
+                    <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#ff4d4f' }}>
+                      {(() => {
+                        const today = new Date().toLocaleDateString('ja-JP');
+                        return dailyStats[today]?.losses || 0;
+                      })()}
+                    </div>
+                  </div>
+                </Card>
+              </Col>
+              <Col xs={24} sm={6}>
+                <Card bodyStyle={{ padding: '12px' }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <Text type="secondary" style={{ fontSize: '12px' }}>勝率</Text>
+                    <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#fa8c16' }}>
+                      {(() => {
+                        const today = new Date().toLocaleDateString('ja-JP');
+                        const stats = dailyStats[today];
+                        if (!stats || (stats.wins + stats.losses) === 0) return '0%';
+                        return `${stats.winRate}%`;
+                      })()}
+                    </div>
+                  </div>
+                </Card>
+              </Col>
+            </Row>
+          </Col>
+          <Col xs={24}>
+            <Card title="アクティブシグナル" size="small" bodyStyle={{ padding: '12px' }}>
+              {activeSignal ? (
                 <Space direction="vertical" style={{ width: '100%' }}>
-                  {currentRange ? (
-                    <>
-                      <div>
-                        <Text strong>レンジ高値: </Text>
-                        <Tag color="green">{currentRange.high.toFixed(3)}</Tag>
-                      </div>
-                      <div>
-                        <Text strong>レンジ安値: </Text>
-                        <Tag color="red">{currentRange.low.toFixed(3)}</Tag>
-                      </div>
-                      <div>
-                        <Text strong>レンジ幅: </Text>
-                        <Text>{currentRange.width} pips</Text>
-                      </div>
-                    </>
-                  ) : (
-                    <div>
-                      <Text type="secondary">レンジ未形成</Text>
-                    </div>
-                  )}
                   <div>
-                    <Text strong>現在価格: </Text>
-                    <Tag color="blue">{currentPrice.toFixed(3)}</Tag>
+                    <Tag color={activeSignal.type === 'buy' ? 'green' : 'red'} style={{ fontSize: '12px', padding: '2px 6px' }}>
+                      {activeSignal.type === 'buy' ? '🔺 BUY' : '🔻 SELL'}
+                    </Tag>
+                    <Text strong style={{ marginLeft: 8, fontSize: '13px' }}>エントリー: {activeSignal.entryPrice}</Text>
+                    <Text style={{ marginLeft: 12, fontSize: '13px' }}>TP: {activeSignal.targetPrice}</Text>
+                    <Text style={{ marginLeft: 12, fontSize: '13px' }}>SL: {activeSignal.stopPrice}</Text>
+                  </div>
+                  <div>
+                    <Text type="secondary" style={{ fontSize: '12px' }}>発生時刻: {activeSignal.timestamp.toLocaleTimeString('ja-JP')}</Text>
                   </div>
                 </Space>
-              </Card>
-              
-              <Card title="シグナル状況">
-                <Space direction="vertical" style={{ width: '100%' }}>
-                  <div>
-                    <Text strong>状態: </Text>
-                    {(() => {
-                      const now = new Date();
-                      const currentHour = now.getHours();
-                      const currentMinute = now.getMinutes();
-                      
-                      const isInRangeTime = (
-                        currentHour === torbSettings.rangeStartHour && currentMinute >= torbSettings.rangeStartMinute
-                      ) || (
-                        currentHour === torbSettings.rangeEndHour && currentMinute < torbSettings.rangeEndMinute
-                      ) || (
-                        currentHour > torbSettings.rangeStartHour && currentHour < torbSettings.rangeEndHour
-                      );
-                      
-                      const isBreakoutTime = currentHour >= torbSettings.rangeEndHour && currentHour < torbSettings.tradingEndHour;
-                      
-                      if (isInRangeTime) {
-                        return <Tag color="orange">レンジ形成中</Tag>;
-                      } else if (isBreakoutTime) {
-                        return <Tag color="blue">ブレイクアウト監視中</Tag>;
-                      } else {
-                        return <Tag color="gray">取引時間外</Tag>;
-                      }
-                    })()} 
-                  </div>
-                  <div>
-                    <Text strong>レンジ時間: </Text>
-                    <Text>{torbSettings.rangeStartHour.toString().padStart(2, '0')}:{torbSettings.rangeStartMinute.toString().padStart(2, '0')} - {torbSettings.rangeEndHour.toString().padStart(2, '0')}:{torbSettings.rangeEndMinute.toString().padStart(2, '0')}</Text>
-                  </div>
-                  {activeSignal ? (
-                    <div>
-                      <Text strong>アクティブシグナル: </Text>
-                      <Tag color={activeSignal.type === 'buy' ? 'green' : 'red'}>
-                        {activeSignal.type === 'buy' ? 'BUY' : 'SELL'} {activeSignal.entryPrice}
-                      </Tag>
-                    </div>
-                  ) : (
-                    <div>
-                      <Text strong>次のシグナル: </Text>
-                      <Text>ブレイクアウト待ち</Text>
-                    </div>
-                  )}
-                </Space>
-              </Card>
-              
-              <Card title="デバッグ情報" size="small">
-                <Space direction="vertical" size="small" style={{ width: '100%' }}>
-                  <div>
-                    <Text type="secondary" style={{ fontSize: '12px' }}>現在時刻</Text>
-                    <br />
-                    <Text code>{new Date().toLocaleTimeString('ja-JP')}</Text>
-                  </div>
-                  
-                  {lastCandleSwitch && (
-                    <div>
-                      <Text type="secondary" style={{ fontSize: '12px' }}>最後の足切替</Text>
-                      <br />
-                      <Text code>{lastCandleSwitch.toLocaleTimeString('ja-JP')}</Text>
-                    </div>
-                  )}
-                  
-                  {chartData.length > 0 && (
-                    <div>
-                      <Text type="secondary" style={{ fontSize: '12px' }}>現在の足時刻</Text>
-                      <br />
-                      <Text code>
-                        {new Date(chartData[chartData.length - 1].time * 1000).toLocaleTimeString('ja-JP')}
-                      </Text>
-                    </div>
-                  )}
-                </Space>
-              </Card>
-            </Space>
+              ) : (
+                <Text type="secondary" style={{ fontSize: '13px' }}>現在アクティブなシグナルはありません</Text>
+              )}
+            </Card>
           </Col>
         </Row>
       ),
     },
     {
-      key: 'signals',
+      key: 'signal-history',
       label: (
         <span>
-          🎯 シグナル履歴
+          📈 シグナル履歴
         </span>
       ),
       children: (
-        <Card>
-          <Title level={4}>今日のシグナル履歴</Title>
-          
-          {/* 日別統計サマリー */}
-          {(() => {
-            const today = new Date().toLocaleDateString('ja-JP');
-            const todayStats = dailyStats[today];
-            
-            if (todayStats) {
-              return (
-                <Card size="small" style={{ marginBottom: '16px', backgroundColor: '#f0f2ff' }}>
-                  <Space size="large">
-                    <div>
-                      <Text strong>総シグナル数: </Text>
-                      <Tag color="blue">{todayStats.totalSignals}</Tag>
-                    </div>
-                    <div>
-                      <Text strong>勝利: </Text>
-                      <Tag color="green">{todayStats.wins}</Tag>
-                    </div>
-                    <div>
-                      <Text strong>敗北: </Text>
-                      <Tag color="red">{todayStats.losses}</Tag>
-                    </div>
-                    <div>
-                      <Text strong>勝率: </Text>
-                      <Tag color={todayStats.winRate >= 50 ? 'green' : 'orange'}>
-                        {todayStats.winRate}%
-                      </Tag>
-                    </div>
-                  </Space>
-                </Card>
-              );
-            }
-            return (
-              <Card size="small" style={{ marginBottom: '16px', backgroundColor: '#f6f6f6' }}>
-                <Text type="secondary">今日はまだシグナルが発生していません</Text>
-              </Card>
-            );
-          })()}
-          
-          {/* シグナル履歴リスト */}
-          <Space direction="vertical" style={{ width: '100%' }} size="middle">
-            {signalHistory.length > 0 ? (
-              signalHistory.map((signal, index) => (
-                <Card key={signal.id || index} size="small">
-                  <Space>
-                    <Tag color={signal.type === 'buy' ? 'green' : 'red'}>
-                      {signal.type === 'buy' ? 'BUY' : 'SELL'}
-                    </Tag>
-                    <Text strong>{signal.entryPrice}</Text>
-                    <Text type="secondary">
-                      {signal.timestamp ? new Date(signal.timestamp).toLocaleTimeString('ja-JP', {
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      }) : ''}
-                    </Text>
-                    {signal.result ? (
-                      <>
-                        <Tag color={signal.result === 'win' ? 'green' : 'red'}>
-                          {signal.result === 'win' ? '利確' : '損切り'}
-                        </Tag>
-                        <Text strong style={{ color: signal.result === 'win' ? '#52c41a' : '#ff4d4f' }}>
-                          {signal.pips > 0 ? '+' : ''}{signal.pips} pips
-                        </Text>
-                      </>
-                    ) : (
-                      <Tag color="orange">進行中</Tag>
-                    )}
-                  </Space>
-                </Card>
-              ))
-            ) : (
-              <Card size="small">
-                <Text type="secondary">シグナル履歴がありません</Text>
-              </Card>
-            )}
-          </Space>
-        </Card>
+        <Row gutter={[24, 24]}>
+          <Col xs={24}>
+            <Card title="今日のシグナル履歴">
+              <Text type="secondary">シグナル履歴がありません</Text>
+            </Card>
+          </Col>
+        </Row>
+      ),
+    },
+    {
+      key: 'debug',
+      label: (
+        <span>
+          🐛 デバッグ情報
+        </span>
+      ),
+      children: (
+        <Row gutter={[24, 24]}>
+          <Col xs={24} lg={12}>
+            <Card title="TORB設定情報">
+              <Space direction="vertical" style={{ width: '100%' }}>
+                <div>
+                  <Text strong>レンジ時間: </Text>
+                  <Text>{torbSettings.rangeStartHour}:{torbSettings.rangeStartMinute.toString().padStart(2, '0')} - {torbSettings.rangeEndHour}:{torbSettings.rangeEndMinute.toString().padStart(2, '0')}</Text>
+                </div>
+                <div>
+                  <Text strong>取引終了: </Text>
+                  <Text>{torbSettings.tradingEndHour}:{torbSettings.tradingEndMinute.toString().padStart(2, '0')}</Text>
+                </div>
+                <div>
+                  <Text strong>レンジ幅制限: </Text>
+                  <Text>{torbSettings.minRangeWidth} - {torbSettings.maxRangeWidth} pips</Text>
+                </div>
+                <div>
+                  <Text strong>利益倍率: </Text>
+                  <Text>{torbSettings.profitMultiplier}x</Text>
+                </div>
+              </Space>
+            </Card>
+          </Col>
+          <Col xs={24} lg={12}>
+            <Card title="現在の状態">
+              <Space direction="vertical" style={{ width: '100%' }}>
+                <div>
+                  <Text strong>現在価格: </Text>
+                  <Text>{currentPrice.toFixed(3)}</Text>
+                </div>
+                <div>
+                  <Text strong>TORBレンジ: </Text>
+                  {currentRange ? (
+                    <Text>High: {currentRange.high.toFixed(3)} / Low: {currentRange.low.toFixed(3)} ({currentRange.width} pips)</Text>
+                  ) : (
+                    <Text type="secondary">未設定</Text>
+                  )}
+                </div>
+                <div>
+                  <Text strong>最後のローソク切替: </Text>
+                  <Text>{lastCandleSwitch ? lastCandleSwitch.toLocaleTimeString('ja-JP') : '未実行'}</Text>
+                </div>
+                <div>
+                  <Text strong>データ本数: </Text>
+                  <Text>15分足: {chartData.length}本 / 5分足: {detailChartData.length}本</Text>
+                </div>
+              </Space>
+            </Card>
+          </Col>
+        </Row>
       ),
     },
   ];
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <AntHeader currentPrice={currentPrice} />
-      <Content style={{ padding: '24px' }}>
+      <AntHeader 
+        currentPrice={currentPrice}
+        currencyPair="USD/JPY"
+        sessionInfo={getCurrentSession()}
+      />
+      <Content style={{ padding: '16px' }}>
         <Tabs defaultActiveKey="chart" items={items} />
       </Content>
     </Layout>

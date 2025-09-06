@@ -1,5 +1,5 @@
 import React from 'react';
-import { Layout, Typography, Statistic, Menu } from 'antd';
+import { Layout, Typography, Statistic, Menu, Space, Tag } from 'antd';
 import { Link, useLocation } from 'react-router-dom';
 import {
   HomeOutlined,
@@ -15,11 +15,16 @@ const { Title, Text } = Typography;
 interface AntHeaderProps {
   currentPrice?: number;
   currencyPair?: string;
+  sessionInfo?: {
+    name: string;
+    color: string;
+  };
 }
 
 const AntHeader: React.FC<AntHeaderProps> = ({ 
   currentPrice, 
-  currencyPair = 'USD/JPY' 
+  currencyPair = 'USD/JPY',
+  sessionInfo
 }) => {
   const location = useLocation();
   
@@ -57,10 +62,12 @@ const AntHeader: React.FC<AntHeaderProps> = ({
       display: 'flex', 
       alignItems: 'center', 
       justifyContent: 'space-between',
-      padding: '0 24px'
+      padding: '0 24px',
+      height: '36px',
+      lineHeight: '36px'
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-        <Title level={3} style={{ color: 'white', margin: 0, fontSize: '1rem' }}>
+        <Title level={5} style={{ color: 'white', margin: 0, fontSize: '13px' }}>
           FX Pattern Analyzer
         </Title>
         
@@ -73,12 +80,34 @@ const AntHeader: React.FC<AntHeaderProps> = ({
             background: 'transparent',
             border: 'none',
             flex: 1,
-            fontSize: '0.9rem'
+            fontSize: '12px',
+            lineHeight: '36px',
+            height: '36px'
           }}
         />
       </div>
       
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <Space size="small">
+          {sessionInfo && (
+            <Tag color={sessionInfo.color} style={{ 
+              fontSize: '10px', 
+              padding: '2px 6px', 
+              height: '20px',
+              lineHeight: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              margin: 0
+            }}>
+              {sessionInfo.name}セッション
+            </Tag>
+          )}
+          {currentPrice && (
+            <Text style={{ color: '#ffffff', fontSize: '11px', fontWeight: 'bold' }}>
+              {currencyPair}: {currentPrice.toFixed(3)}
+            </Text>
+          )}
+        </Space>
       </div>
     </Header>
   );
