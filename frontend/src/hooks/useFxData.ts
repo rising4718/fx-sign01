@@ -67,7 +67,11 @@ export const useFxData = (symbol: string = 'USDJPY'): UseFxDataReturn => {
         if (currentData.length > 0) {
           const lastCandle = currentData[currentData.length - 1];
           const now = Math.floor(Date.now() / 1000);
-          const lastTime = typeof lastCandle.time === 'number' ? lastCandle.time : new Date(lastCandle.time).getTime() / 1000;
+          const lastTime = typeof lastCandle.time === 'number' 
+            ? lastCandle.time 
+            : typeof lastCandle.time === 'string'
+            ? new Date(lastCandle.time).getTime() / 1000
+            : new Date((lastCandle.time as any).year, (lastCandle.time as any).month - 1, (lastCandle.time as any).day).getTime() / 1000;
           
           // 15分経過していたら新しいローソク足を追加
           if (now - lastTime >= 15 * 60) {

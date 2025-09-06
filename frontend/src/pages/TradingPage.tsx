@@ -4,11 +4,13 @@ import Chart from '../components/Chart';
 import DualChart from '../components/DualChart';
 import AntHeader from '../components/AntHeader';
 import { fxApiService } from '../services/fxApi';
+import { useSettings } from '../contexts/SettingsContext';
 
 const { Content } = Layout;
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 const TradingPage: React.FC = () => {
+  const { settings, isDemo } = useSettings();
   const [currentPrice, setCurrentPrice] = useState<number>(150.123);
   const [chartData, setChartData] = useState<any[]>([]);
   const [detailChartData, setDetailChartData] = useState<any[]>([]);
@@ -488,8 +490,12 @@ const TradingPage: React.FC = () => {
       ),
       children: (
         <Row gutter={[24, 24]}>
-          <Col xs={24}>
-            <Card style={{ height: '600px', backgroundColor: '#141414' }}>
+          <Col xs={24} lg={19}>
+            <Card style={{ 
+              minHeight: '380px', 
+              height: 'auto',
+              backgroundColor: '#141414'
+            }}>
               <DualChart 
                 mainData={chartData}
                 detailData={detailChartData}
@@ -498,6 +504,148 @@ const TradingPage: React.FC = () => {
                 signals={signalHistory}
               />
             </Card>
+          </Col>
+          <Col xs={24} lg={5}>
+            <Row gutter={[0, 12]}>
+              <Col xs={24}>
+                <Card title="💰 損益" size="small" bodyStyle={{ padding: '12px' }}>
+                  <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
+                    <Text style={{ fontSize: '12px', color: '#8c8c8c' }}>残高</Text>
+                    <Text style={{ fontSize: '15px', fontWeight: 'bold', color: '#52c41a' }}>
+                      {(() => {
+                        const today = new Date().toLocaleDateString('ja-JP');
+                        const stats = dailyStats[today];
+                        const totalPnL = stats ? (stats.wins * 5000) - (stats.losses * 3000) : 0;
+                        const initialBalance = isDemo ? settings.demo.initialBalance : settings.demo.initialBalance;
+                        return `¥${(initialBalance + totalPnL).toLocaleString()}`;
+                      })()}
+                    </Text>
+                  </div>
+                  <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
+                    <Text style={{ fontSize: '12px', color: '#8c8c8c' }}>本日</Text>
+                    <Text style={{ 
+                      fontSize: '15px', 
+                      fontWeight: 'bold',
+                      color: (() => {
+                        const today = new Date().toLocaleDateString('ja-JP');
+                        const stats = dailyStats[today];
+                        const totalPnL = stats ? (stats.wins * 5000) - (stats.losses * 3000) : 0;
+                        return totalPnL >= 0 ? '#52c41a' : '#ff4d4f';
+                      })()
+                    }}>
+                      {(() => {
+                        const today = new Date().toLocaleDateString('ja-JP');
+                        const stats = dailyStats[today];
+                        const totalPnL = stats ? (stats.wins * 5000) - (stats.losses * 3000) : 0;
+                        return `${totalPnL >= 0 ? '+' : ''}¥${totalPnL.toLocaleString()}`;
+                      })()}
+                    </Text>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Text style={{ fontSize: '12px', color: '#8c8c8c' }}>DD</Text>
+                    <Text style={{ fontSize: '15px', fontWeight: 'bold', color: '#ff4d4f' }}>
+                      -¥12,000
+                    </Text>
+                  </div>
+                </Card>
+              </Col>
+              <Col xs={24}>
+                <Card title="📊 取引" size="small" bodyStyle={{ padding: '12px' }}>
+                  <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
+                    <Text style={{ fontSize: '12px', color: '#8c8c8c' }}>取引量</Text>
+                    <Text style={{ fontSize: '15px', fontWeight: 'bold', color: '#1890ff' }}>
+                      {settings.demo.lotSize.toLocaleString()}通貨
+                    </Text>
+                  </div>
+                  <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
+                    <Text style={{ fontSize: '12px', color: '#8c8c8c' }}>本日回数</Text>
+                    <Text style={{ fontSize: '15px', fontWeight: 'bold', color: '#ffffff' }}>
+                      {(() => {
+                        const today = new Date().toLocaleDateString('ja-JP');
+                        const stats = dailyStats[today];
+                        return stats ? stats.totalSignals : 0;
+                      })()}回
+                    </Text>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Text style={{ fontSize: '12px', color: '#8c8c8c' }}>証拠金</Text>
+                    <Text style={{ fontSize: '15px', fontWeight: 'bold', color: '#fa8c16' }}>
+                      23%
+                    </Text>
+                  </div>
+                </Card>
+              </Col>
+              <Col xs={24}>
+                <Card title="💼 ポジション" size="small" bodyStyle={{ padding: '12px' }}>
+                  {activeSignal ? (
+                    <div>
+                      <div style={{ marginBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Tag color={activeSignal.type === 'buy' ? 'green' : 'red'} style={{ fontSize: '11px', margin: 0 }}>
+                          {activeSignal.type === 'buy' ? 'LONG' : 'SHORT'}
+                        </Tag>
+                        <Text style={{ fontSize: '13px', color: '#ffffff' }}>USD/JPY</Text>
+                      </div>
+                      <div style={{ marginBottom: 6, display: 'flex', justifyContent: 'space-between' }}>
+                        <Text style={{ fontSize: '12px', color: '#8c8c8c' }}>エントリー</Text>
+                        <Text style={{ fontSize: '15px', fontWeight: 'bold', color: '#ffffff' }}>
+                          {activeSignal.entryPrice}
+                        </Text>
+                      </div>
+                      <div style={{ marginBottom: 6, display: 'flex', justifyContent: 'space-between' }}>
+                        <Text style={{ fontSize: '12px', color: '#8c8c8c' }}>現在</Text>
+                        <Text style={{ fontSize: '15px', fontWeight: 'bold', color: '#ffeb3b' }}>
+                          {currentPrice.toFixed(3)}
+                        </Text>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <Text style={{ fontSize: '12px', color: '#8c8c8c' }}>含み損益</Text>
+                        <Text style={{ 
+                          fontSize: '15px', 
+                          fontWeight: 'bold',
+                          color: (() => {
+                            const pips = activeSignal.type === 'buy' 
+                              ? (currentPrice - activeSignal.entryPrice) * 10000 
+                              : (activeSignal.entryPrice - currentPrice) * 10000;
+                            return pips >= 0 ? '#52c41a' : '#ff4d4f';
+                          })()
+                        }}>
+                          {(() => {
+                            const pips = activeSignal.type === 'buy' 
+                              ? (currentPrice - activeSignal.entryPrice) * 10000 
+                              : (activeSignal.entryPrice - currentPrice) * 10000;
+                            return `${pips >= 0 ? '+' : ''}${pips.toFixed(1)}p`;
+                          })()}
+                        </Text>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ textAlign: 'center', color: '#8c8c8c', padding: '12px 0' }}>
+                      <Text style={{ fontSize: '13px', color: '#8c8c8c' }}>ポジションなし</Text>
+                    </div>
+                  )}
+                </Card>
+              </Col>
+              <Col xs={24}>
+                <Card title="⚙️ システム" size="small" bodyStyle={{ padding: '12px' }}>
+                  <div style={{ marginBottom: 6, display: 'flex', justifyContent: 'space-between' }}>
+                    <Text style={{ fontSize: '12px', color: '#8c8c8c' }}>モード</Text>
+                    <Tag color={isDemo ? 'blue' : 'red'} style={{ fontSize: '11px', margin: 0 }}>
+                      {isDemo ? 'DEMO' : 'REAL'}
+                    </Tag>
+                  </div>
+                  <div style={{ marginBottom: 6, display: 'flex', justifyContent: 'space-between' }}>
+                    <Text style={{ fontSize: '12px', color: '#8c8c8c' }}>自動取引</Text>
+                    <Tag color={settings.trading.autoTrading ? 'green' : 'red'} style={{ fontSize: '11px', margin: 0 }}>
+                      {settings.trading.autoTrading ? 'ON' : 'OFF'}
+                    </Tag>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Text style={{ fontSize: '12px', color: '#8c8c8c' }}>次回シグナル</Text>
+                    <Text style={{ fontSize: '13px', color: '#fa8c16' }}>09:45</Text>
+                  </div>
+                </Card>
+              </Col>
+            </Row>
           </Col>
           <Col xs={24}>
             <Row gutter={[16, 16]}>

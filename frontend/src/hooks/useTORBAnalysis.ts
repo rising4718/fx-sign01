@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { CandlestickData } from 'lightweight-charts';
-import { TORBSignal, TORBRange, MarketData } from '../types';
+import { type TORBSignal, TORBRange, MarketData } from '../types';
 import { TORBLogic } from '../utils/torbLogic';
 
 interface UseTORBAnalysisReturn {

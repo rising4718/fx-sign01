@@ -1,12 +1,12 @@
 import Header from "./components/Header";
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import Chart from './components/Chart';
 import './App.css';
 
 function AppWithMock() {
   const [currentPrice, setCurrentPrice] = useState(150.123);
   const [change, setChange] = useState(0.045);
-  const [chartData, setChartData] = useState([]);
+  const [chartData, setChartData] = useState<{time: number, open: number, high: number, low: number, close: number}[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // 簡単なモックデータ生成

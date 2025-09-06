@@ -1,4 +1,4 @@
-import type { OHLCData, FXApiResponse, MarketData, CurrencyPair } from '../types';
+import type { FXApiResponse, MarketData, CurrencyPair } from '../types';
 import type { CandlestickData } from 'lightweight-charts';
 import { CURRENCY_PAIRS } from '../constants/currencyPairs';
 

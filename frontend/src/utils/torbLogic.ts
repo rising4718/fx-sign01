@@ -1,5 +1,5 @@
 import type { CandlestickData } from 'lightweight-charts';
-import { TORBSignal, TORBRange, TORBSettings } from '../types';
+import { type TORBSignal, type TORBRange, type TORBSettings } from '../types';
 
 // デフォルトのTORB設定
 export const DEFAULT_TORB_SETTINGS: TORBSettings = {
@@ -12,7 +12,8 @@ export const DEFAULT_TORB_SETTINGS: TORBSettings = {
   minRangeWidth: 15, // pips
   maxRangeWidth: 50, // pips
   profitMultiplier: 1.5,
-  stopLossBuffer: 5 // pips
+  stopLossBuffer: 5, // pips
+  selectedPairs: ['USDJPY'] // Default to USD/JPY
 };
 
 // 1pip = 0.01 (USD/JPY)
@@ -44,7 +45,11 @@ export class TORBLogic {
 
     // レンジ期間内のデータを抽出
     const rangeData = data.filter(candle => {
-      const candleTime = typeof candle.time === 'number' ? candle.time : new Date(candle.time).getTime() / 1000;
+      const candleTime = typeof candle.time === 'number' 
+        ? candle.time 
+        : typeof candle.time === 'string'
+        ? new Date(candle.time).getTime() / 1000
+        : new Date((candle.time as any).year, (candle.time as any).month - 1, (candle.time as any).day).getTime() / 1000;
       return candleTime >= rangeStartTime && candleTime <= rangeEndTime;
     });
 

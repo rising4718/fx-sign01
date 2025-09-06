@@ -1,5 +1,5 @@
 import type { CandlestickData } from 'lightweight-charts';
-import { TORBSignal, TORBSettings, CurrencyPair } from '../types';
+import { type TORBSignal, type TORBSettings, type CurrencyPair } from '../types';
 import { CURRENCY_PAIRS } from '../constants/currencyPairs';
 import { TORBLogic } from './torbLogic';
 
@@ -122,7 +122,11 @@ export class BacktestEngine {
     // 日付フィルタリング
     const filteredData = data.filter(candle => {
       const candleTime = new Date(
-        typeof candle.time === 'number' ? candle.time * 1000 : candle.time
+        typeof candle.time === 'number' 
+          ? candle.time * 1000 
+          : typeof candle.time === 'string'
+          ? candle.time
+          : new Date((candle.time as any).year, (candle.time as any).month - 1, (candle.time as any).day).getTime()
       );
       return candleTime >= parameters.startDate && candleTime <= parameters.endDate;
     });
@@ -130,7 +134,11 @@ export class BacktestEngine {
     for (let i = 20; i < filteredData.length; i++) { // 最低20本のデータが必要
       const current = filteredData[i];
       const currentDate = new Date(
-        typeof current.time === 'number' ? current.time * 1000 : current.time
+        typeof current.time === 'number' 
+          ? current.time * 1000 
+          : typeof current.time === 'string'
+          ? current.time
+          : new Date((current.time as any).year, (current.time as any).month - 1, (current.time as any).day).getTime()
       );
 
       // 週末をスキップ

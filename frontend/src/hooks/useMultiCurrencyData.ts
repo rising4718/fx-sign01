@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { CandlestickData } from 'lightweight-charts';
-import { CurrencyPair, CurrencyPairState, MarketData } from '../types';
+import { type CurrencyPair, CurrencyPairState, MarketData } from '../types';
 import { fxApiService } from '../services/fxApi';
 import { CURRENCY_PAIRS } from '../constants/currencyPairs';
 

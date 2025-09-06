@@ -1,8 +1,8 @@
 import { useState, useCallback } from 'react';
-import { BacktestResult, BacktestParameters, backtestEngine } from '../utils/backtestEngine';
+import { type BacktestResult, BacktestParameters, backtestEngine } from '../utils/backtestEngine';
 import { fxApiService } from '../services/fxApi';
 import type { CandlestickData } from 'lightweight-charts';
-import { CurrencyPair } from '../types';
+import { type CurrencyPair } from '../types';
 
 interface UseBacktestReturn {
   result: BacktestResult | null;
@@ -40,15 +40,27 @@ export const useBacktest = (): UseBacktestReturn => {
       // 日付範囲でフィルター
       const filteredData = data.filter(candle => {
         const candleTime = new Date(
-          typeof candle.time === 'number' ? candle.time * 1000 : candle.time
+          typeof candle.time === 'number' 
+            ? candle.time * 1000 
+            : typeof candle.time === 'string'
+            ? candle.time
+            : new Date((candle.time as any).year, (candle.time as any).month - 1, (candle.time as any).day).getTime()
         );
         return candleTime >= startDate && candleTime <= endDate;
       });
 
       // データを時系列順にソート
       filteredData.sort((a, b) => {
-        const timeA = typeof a.time === 'number' ? a.time : new Date(a.time).getTime() / 1000;
-        const timeB = typeof b.time === 'number' ? b.time : new Date(b.time).getTime() / 1000;
+        const timeA = typeof a.time === 'number' 
+          ? a.time 
+          : typeof a.time === 'string'
+          ? new Date(a.time).getTime() / 1000
+          : new Date((a.time as any).year, (a.time as any).month - 1, (a.time as any).day).getTime() / 1000;
+        const timeB = typeof b.time === 'number' 
+          ? b.time 
+          : typeof b.time === 'string'
+          ? new Date(b.time).getTime() / 1000
+          : new Date((b.time as any).year, (b.time as any).month - 1, (b.time as any).day).getTime() / 1000;
         return timeA - timeB;
       });
 

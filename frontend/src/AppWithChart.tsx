@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Layout, Tabs, Card, Statistic, Row, Col, Typography, Tag, Space, Button, message } from 'antd';
+import { useState, useEffect } from 'react';
+import { Layout, Tabs, Card, Row, Col, Typography, Tag, Space, message } from 'antd';
 import { LineChartOutlined, SettingOutlined, RiseOutlined, InfoCircleOutlined, DollarOutlined, BarChartOutlined } from '@ant-design/icons';
 import Chart from './components/Chart';
 import LogicManagement from './components/LogicManagement';
@@ -9,14 +9,14 @@ import AntHeader from './components/AntHeader';
 import 'antd/dist/reset.css';
 import './App.css';
 
-const { Header, Content } = Layout;
-const { Title, Text } = Typography;
+const { Content } = Layout;
+const { Text } = Typography;
 
 function AppWithChart() {
   const [currentPrice, setCurrentPrice] = useState(150.123);
-  const [chartData, setChartData] = useState([]);
+  const [chartData, setChartData] = useState<{time: number, open: number, high: number, low: number, close: number}[]>([]);
   const [lastCandleSwitch, setLastCandleSwitch] = useState<Date | null>(null);
-  const [activeTab, setActiveTab] = useState<'chart' | 'logic' | 'results' | 'fund'>('chart');
+  const [activeTab] = useState<'chart' | 'logic' | 'results' | 'fund'>('chart');
   
   // レンジとサイン管理
   const [currentRange, setCurrentRange] = useState<{high: number, low: number, width: number} | null>(null);
@@ -66,7 +66,7 @@ function AppWithChart() {
       const saved = localStorage.getItem('torbSettings');
       if (saved) {
         const newSettings = JSON.parse(saved);
-        setTorbSettings(prevSettings => {
+        setTorbSettings((prevSettings: any) => {
           // オブジェクトの値が変更されているかチェック
           if (JSON.stringify(prevSettings) !== JSON.stringify(newSettings)) {
             return newSettings;
@@ -109,6 +109,7 @@ function AppWithChart() {
   };
 
   // 取引実行ハンドラー（手動用 - 今後は不要）
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const executeTrade = () => {
     if (!activeSignal) return;
     
@@ -141,6 +142,7 @@ function AppWithChart() {
   };
 
   // 取引決済ハンドラー
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const closeTrade = (tradeId: number, exitPrice: number, result: 'win' | 'loss') => {
     const updatedHistory = tradingHistory.map((trade: any) => {
       if (trade.id === tradeId && trade.status === 'active') {

@@ -1,11 +1,18 @@
 import Header from "./components/Header";
-import React from 'react';
 import Chart from './components/Chart';
 import { useFxData } from './hooks/useFxData';
 import './App.css';
 
 function AppWithData() {
-  const { chartData, currentPrice, isLoading, error } = useFxData('USDJPY');
+  const { chartData: rawChartData, currentPrice, isLoading, error } = useFxData('USDJPY');
+  
+  // Convert BusinessDay to string/number for Chart component
+  const chartData = rawChartData.map(item => ({
+    ...item,
+    time: typeof item.time === 'object' && 'year' in item.time 
+      ? new Date(item.time.year, item.time.month - 1, item.time.day).getTime()
+      : item.time
+  }));
 
   // ローディング状態の表示
   if (isLoading) {

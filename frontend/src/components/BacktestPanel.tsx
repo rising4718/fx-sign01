@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { BacktestResult, BacktestParameters, DailyPnL } from '../utils/backtestEngine';
-import { CurrencyPair, TORBSettings } from '../types';
+import { type BacktestResult, type BacktestParameters, type DailyPnL } from '../utils/backtestEngine';
+import { type CurrencyPair, type TORBSettings } from '../types';
 import { DEFAULT_TORB_SETTINGS } from '../utils/torbLogic';
 import { CURRENCY_PAIRS } from '../constants/currencyPairs';
 

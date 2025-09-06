@@ -1,13 +1,15 @@
 import React from 'react';
-import { Layout, Typography, Statistic, Menu, Space, Tag } from 'antd';
+import { Layout, Typography, Menu, Space, Tag } from 'antd';
 import { Link, useLocation } from 'react-router-dom';
 import {
   HomeOutlined,
   BarChartOutlined,
   SettingOutlined,
   FileTextOutlined,
-  DollarOutlined
+  DollarOutlined,
+  ControlOutlined
 } from '@ant-design/icons';
+import TradingModeToggle from './TradingModeToggle';
 
 const { Header } = Layout;
 const { Title, Text } = Typography;
@@ -53,6 +55,11 @@ const AntHeader: React.FC<AntHeaderProps> = ({
       key: '/results',
       icon: <FileTextOutlined />,
       label: <Link to="/results">取引結果</Link>
+    },
+    {
+      key: '/settings',
+      icon: <ControlOutlined />,
+      label: <Link to="/settings">設定</Link>
     }
   ];
 
@@ -88,6 +95,7 @@ const AntHeader: React.FC<AntHeaderProps> = ({
       </div>
       
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <TradingModeToggle />
         <Space size="small">
           {sessionInfo && (
             <Tag color={sessionInfo.color} style={{ 

@@ -1,5 +1,5 @@
 import type { CandlestickData } from 'lightweight-charts';
-import type { OHLCData } from '../types';
+import type {} from '../types';
 
 // モックデータ生成関数
 export const generateMockOHLCData = (
@@ -113,7 +113,11 @@ export const generateTORBMockData = (): CandlestickData[] => {
 
 // リアルタイム更新用のモックデータ
 export const generateNextCandle = (lastCandle: CandlestickData): CandlestickData => {
-  const lastTime = typeof lastCandle.time === 'number' ? lastCandle.time : new Date(lastCandle.time).getTime() / 1000;
+  const lastTime = typeof lastCandle.time === 'number' 
+    ? lastCandle.time 
+    : typeof lastCandle.time === 'string'
+    ? new Date(lastCandle.time).getTime() / 1000
+    : new Date((lastCandle.time as any).year, (lastCandle.time as any).month - 1, (lastCandle.time as any).day).getTime() / 1000;
   const nextTime = lastTime + (15 * 60); // 15分後
   
   const volatility = 0.001;

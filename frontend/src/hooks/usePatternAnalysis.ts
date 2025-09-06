@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { CandlestickData } from 'lightweight-charts';
-import { PatternAnalysis, CurrencyPair, MarketData } from '../types';
+import { PatternAnalysis, type CurrencyPair, MarketData } from '../types';
 import { patternAnalysisEngine } from '../utils/patternAnalysis';
 
 interface UsePatternAnalysisReturn {

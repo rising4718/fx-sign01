@@ -1,4 +1,20 @@
-import { CurrencyInfo, CurrencyPair } from '../types';
+// 型定義をローカルで定義（import問題回避）
+type CurrencyPair = 'USDJPY' | 'EURUSD' | 'GBPUSD' | 'AUDUSD';
+
+interface CurrencyInfo {
+  name: CurrencyPair;
+  displayName: string;
+  pipValue: number;
+  decimalPlaces: number;
+  sessionTimes: {
+    rangeStartHour: number;
+    rangeStartMinute: number;
+    rangeEndHour: number; 
+    rangeEndMinute: number;
+    tradingEndHour: number;
+    tradingEndMinute: number;
+  };
+}
 
 export const CURRENCY_PAIRS: Record<CurrencyPair, CurrencyInfo> = {
   USDJPY: {

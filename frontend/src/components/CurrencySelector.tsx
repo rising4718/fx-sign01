@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CurrencyPair } from '../types';
+import { type CurrencyPair } from '../types';
 import { CURRENCY_PAIRS, getCurrentSessionPairs } from '../constants/currencyPairs';
 
 interface CurrencySelectorProps {

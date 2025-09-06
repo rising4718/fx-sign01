@@ -1,5 +1,5 @@
 import React from 'react';
-import { PatternAnalysis, PatternMatch } from '../types';
+import { type PatternAnalysis, type PatternMatch } from '../types';
 
 interface PatternAnalysisPanelProps {
   analysis: PatternAnalysis | null;
