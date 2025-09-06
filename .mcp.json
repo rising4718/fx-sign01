@@ -7,9 +7,21 @@
         "GITHUB_PERSONAL_ACCESS_TOKEN": "your_token_here"
       }
     },
-    "memory": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-memory"]
+    "conport": {
+      "command": "/home/milky8/.local/bin/uvx",
+      "args": [
+        "--from",
+        "context-portal-mcp",
+        "conport-mcp",
+        "--mode",
+        "stdio",
+        "--workspace_id",
+        "/home/milky8/dev/fx-sign01",
+        "--log-file",
+        "./logs/conport.log",
+        "--log-level",
+        "INFO"
+      ]
     }
   }
 }
