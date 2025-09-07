@@ -198,6 +198,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return true;
       } else {
         const errorData = await response.json();
+        console.error('Registration error response:', errorData);
+        
         if (errorData.details && errorData.details.length > 0) {
           const detailedErrors = errorData.details.map((err: any) => err.msg).join('\n');
           message.error(detailedErrors);
