@@ -7,7 +7,8 @@ import {
   SettingOutlined,
   CrownOutlined,
   StarOutlined,
-  GiftOutlined
+  GiftOutlined,
+  ControlOutlined
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -69,8 +70,21 @@ const UserProfile: React.FC = () => {
     {
       key: 'settings',
       icon: <SettingOutlined />,
-      label: 'アカウント設定',
-      onClick: () => navigate('/settings'),
+      label: '設定',
+      children: [
+        {
+          key: 'account-settings',
+          icon: <SettingOutlined />,
+          label: 'アカウント設定',
+          onClick: () => navigate('/settings'),
+        },
+        {
+          key: 'torb-settings',
+          icon: <ControlOutlined />,
+          label: 'TORB設定',
+          onClick: () => navigate('/torb-logic'),
+        },
+      ]
     },
     {
       type: 'divider',

@@ -49,11 +49,6 @@ const AntHeader: React.FC<AntHeaderProps> = ({
       label: <Link to="/trading">取引画面</Link>
     },
     {
-      key: '/torb-logic',
-      icon: <SettingOutlined />,
-      label: <Link to="/torb-logic">TORB設定</Link>
-    },
-    {
       key: '/fund-management',
       icon: <DollarOutlined />,
       label: <Link to="/fund-management">資金管理</Link>
@@ -73,11 +68,6 @@ const AntHeader: React.FC<AntHeaderProps> = ({
       icon: <RocketOutlined />,
       label: <Link to="/release-notes">戦略進化ログ</Link>
     },
-    {
-      key: '/settings',
-      icon: <ControlOutlined />,
-      label: <Link to="/settings">設定</Link>
-    }
   ];
 
   return (
