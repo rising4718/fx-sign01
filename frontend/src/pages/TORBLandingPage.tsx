@@ -21,7 +21,12 @@ import {
   BarChartOutlined,
   SafetyCertificateOutlined,
   ThunderboltOutlined,
-  GlobalOutlined
+  GlobalOutlined,
+  RobotOutlined,
+  CheckCircleOutlined,
+  HeartOutlined,
+  EyeOutlined,
+  WarningOutlined
 } from '@ant-design/icons';
 import AntHeader from '../components/AntHeader';
 
@@ -36,18 +41,18 @@ const TORBLandingPage: React.FC = () => {
       {/* Hero Section */}
       <Content style={{ padding: 0 }}>
         <div style={{
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          background: 'linear-gradient(135deg, #1a365d 0%, #2d3748 100%)',
           padding: '80px 0',
           color: 'white',
           textAlign: 'center'
         }}>
           <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 24px' }}>
             <Title level={1} style={{ color: 'white', fontSize: '3rem', marginBottom: '24px' }}>
-              東京時間レンジブレイクアウト戦略
+              東京ボックス・ブレイクアウト戦略
             </Title>
             <Paragraph style={{ fontSize: '1.2rem', color: 'rgba(255,255,255,0.9)', marginBottom: '40px' }}>
-              プロトレーダーが愛用する東京時間特化型の高勝率FX戦略<br/>
-              9:00-11:00の限定時間で効率的に利益を狙う
+              毎朝のレンジから大きな流れに乗るシンプル戦略<br/>
+              AIが動かす現代相場で、ストップ狩りを避けてルールで戦う
             </Paragraph>
             <Space size="large">
               <Button type="primary" size="large" style={{ height: '50px', fontSize: '16px', padding: '0 30px' }}>
