@@ -1,8 +1,27 @@
 # FX Sign Tool - 東京時間特化型サインツール
 
-## プロジェクト概要
+![Status](https://img.shields.io/badge/Status-Production%20Ready-brightgreen) ![Version](https://img.shields.io/badge/Version-v2.0.0-blue) ![License](https://img.shields.io/badge/License-Private-red)
+
+## 🎯 プロジェクト概要
 
 USD/JPYデイトレード用のサインツールで、東京時間（9:00-11:00 JST）のTokyo Opening Range Breakout（TORB）戦略に特化したアプリケーションです。
+
+## 🌐 デモ・アクセス
+
+**🚀 本番環境:** [http://46.250.250.63](http://46.250.250.63)
+
+## 📚 ドキュメント
+
+| ドキュメント | 内容 | リンク |
+|------------|------|-------|
+| 📖 技術仕様書 | システム全体の技術詳細 | [TECHNICAL_SPECIFICATION_V2.md](./TECHNICAL_SPECIFICATION_V2.md) |
+| 🚀 デプロイガイド | VPSデプロイメント手順 | [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) |
+| 📋 デプロイ仕様書 | デプロイメント技術仕様 | [DEPLOYMENT_SPECIFICATION.md](./DEPLOYMENT_SPECIFICATION.md) |
+| 📈 TORB戦略詳細 | 東京ボックス戦略の完全仕様 | [tokyo_box_strategy_spec.md](./tokyo_box_strategy_spec.md) |
+| 💼 TORB戦略LP | マーケティング・説明資料 | [tokyo_box_strategy_lp.md](./tokyo_box_strategy_lp.md) |
+| ⚠️ コンプライアンス | 法的要件・規制対応 | [COMPLIANCE_AND_REQUIREMENTS.md](./COMPLIANCE_AND_REQUIREMENTS.md) |
+| 🔄 API代替戦略 | API障害時の対応策 | [API_FALLBACK_STRATEGY.md](./API_FALLBACK_STRATEGY.md) |
+| 🔧 引き継ぎ手順 | 開発者向け引き継ぎ情報 | [HANDOFF_INSTRUCTIONS.md](./HANDOFF_INSTRUCTIONS.md) |
 
 ## Phase 1 実装内容 ✅
 
@@ -37,13 +56,32 @@ USD/JPYデイトレード用のサインツールで、東京時間（9:00-11:00
    - 時間別ステータス表示
    - 自動シグナルリセット
 
-## 技術スタック
+## 💻 技術スタック
 
-- **フロントエンド**: React 19 + TypeScript + Vite
+### フロントエンド
+- **フレームワーク**: React 19 + TypeScript + Vite
+- **UIライブラリ**: Ant Design 5.x
 - **チャート**: TradingView Lightweight Charts v5.0.8
-- **API**: FreeForexAPI (USD/JPY)
-- **スタイル**: CSS3 + Flexbox
-- **開発環境**: Node.js + ESLint
+- **状態管理**: React Context + Custom Hooks
+- **スタイリング**: CSS3 + Flexbox + Ant Design Components
+
+### バックエンド
+- **ランタイム**: Node.js 20+ + Express.js
+- **言語**: TypeScript
+- **WebSocket**: Socket.io / ws
+- **HTTP**: Express + CORS + Helmet
+- **ログ**: Winston Logger
+
+### インフラ・デプロイ
+- **Webサーバー**: Nginx (リバースプロキシ)
+- **プロセス管理**: PM2
+- **OS**: Ubuntu 24.04 LTS
+- **VPS**: Contabo VPS
+
+### 外部API
+- **FX価格データ**: FreeForexAPI (メイン)
+- **フォールバック**: モックデータ生成器
+- **更新頻度**: 1秒間隔
 
 ## プロジェクト構造
 
@@ -89,23 +127,42 @@ fx-sign01/
     └── ARCHITECTURE.md
 ```
 
-## 開発・起動方法
+## ⚡ クイックスタート
+
+### 🖥️ ローカル開発環境
 
 ```bash
-# 依存関係のインストール
+# フロントエンド開発
 cd frontend
 npm install
-
-# 開発サーバー起動
 npm run dev
 # → http://localhost:5173
 
-# ビルド
-npm run build
-
-# プレビュー
-npm run preview
+# バックエンド開発 (別ターミナル)
+cd backend
+npm install
+npm run dev
+# → http://localhost:3001
 ```
+
+### 🚀 本番デプロイ
+
+```bash
+# 1. VPSにSSH接続
+ssh root@46.250.250.63
+
+# 2. アプリケーション更新
+cd /var/www/fx-sign01
+git pull origin main
+
+# 3. バックエンド再起動
+cd backend && npm install && pm2 restart fxsign
+
+# 4. フロントエンド更新
+cd ../frontend && npm install && npm run build
+```
+
+詳細なデプロイ手順は [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) を参照してください。
 
 ## TORBストラテジー詳細
 
@@ -165,10 +222,31 @@ npm run preview
 
 Private Project - 商用利用禁止
 
-## 更新履歴
+## 📅 更新履歴
+
+### v2.0.0 (2025-09-07) - 本番リリース 🎉
+- ✅ フルスタックアプリケーション完成
+- ✅ Node.js + Express バックエンド実装
+- ✅ TypeScript完全対応
+- ✅ Ant Design UI実装
+- ✅ 東京ボックス戦略完全実装
+- ✅ バックテスト機能実装
+- ✅ テクニカル指標統合
+- ✅ VPS本番デプロイ完了
+- ✅ GitHub認証問題解決
+
+### v1.5.0 (2025-09-06)
+- フロントエンド・バックエンド統合
+- WebSocket接続実装
+- GMOコインAPI統合
+- UI改善とタブ分離
 
 ### v1.0.0 (2024-09-04)
 - Phase 1 基本機能実装完了
 - TORB戦略実装
 - リアルタイムチャート表示
 - FX API統合
+
+## 🙏 謝辞
+
+本プロジェクトは、FXトレーディングの自動化と効率化を目指して開発されました。TORB（Tokyo Opening Range Breakout）戦略の実装により、東京時間の取引機会を最大化することを目標としています。
