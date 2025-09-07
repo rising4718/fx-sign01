@@ -1,28 +1,41 @@
-# FX Sign Tool - 東京時間特化型サインツール
+# FX Pattern Analyzer - 東京時間特化型サインツール
 
-![Status](https://img.shields.io/badge/Status-Production%20Ready-brightgreen) ![Version](https://img.shields.io/badge/Version-v2.0.0-blue) ![License](https://img.shields.io/badge/License-Private-red)
+![Status](https://img.shields.io/badge/Status-Production%20Ready-brightgreen) ![Version](https://img.shields.io/badge/Version-v2.2.0-blue) ![License](https://img.shields.io/badge/License-Private-red) ![CI/CD](https://img.shields.io/badge/GitHub%20Actions-Active-success)
 
 ## 🎯 プロジェクト概要
 
-USD/JPYデイトレード用のサインツールで、東京時間（9:00-11:00 JST）のTokyo Opening Range Breakout（TORB）戦略に特化したアプリケーションです。
+USD/JPYデイトレード用の高度なパターン分析ツールで、東京時間（9:00-11:00 JST）のTokyo Opening Range Breakout（TORB）戦略に特化したWebアプリケーションです。現在**Phase 1完了**（データ収集・基盤構築）、**Phase 2開始可能**（環境適応型戦略）の状況です。
 
-## 🌐 デモ・アクセス
+## 🌐 本番環境・アクセス
 
-**🚀 本番環境:** [https://fxbuybuy.site](https://fxbuybuy.site) (SSL完全対応)  
-**📊 旧IP:** [http://46.250.250.63](http://46.250.250.63) (リダイレクト)
+**🚀 本番サイト:** [https://fxbuybuy.site](https://fxbuybuy.site) (SSL完全対応)  
+**📊 パフォーマンスダッシュボード:** [https://fxbuybuy.site/performance](https://fxbuybuy.site/performance)  
+**🔧 GitHub Actions:** [CI/CD Pipeline](https://github.com/rising4718/fx-sign01/actions)
 
-## 📚 ドキュメント
+## 📚 ドキュメントハブ
 
-| ドキュメント | 内容 | リンク |
-|------------|------|-------|
-| 📖 技術仕様書 | システム全体の技術詳細 | [TECHNICAL_SPECIFICATION_V2.md](./TECHNICAL_SPECIFICATION_V2.md) |
-| 🚀 デプロイガイド | VPSデプロイメント手順 | [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) |
-| 📋 デプロイ仕様書 | デプロイメント技術仕様 | [DEPLOYMENT_SPECIFICATION.md](./DEPLOYMENT_SPECIFICATION.md) |
-| 📈 TORB戦略詳細 | 東京ボックス戦略の完全仕様 | [tokyo_box_strategy_spec.md](./tokyo_box_strategy_spec.md) |
-| 💼 TORB戦略LP | マーケティング・説明資料 | [tokyo_box_strategy_lp.md](./tokyo_box_strategy_lp.md) |
-| ⚠️ コンプライアンス | 法的要件・規制対応 | [COMPLIANCE_AND_REQUIREMENTS.md](./COMPLIANCE_AND_REQUIREMENTS.md) |
-| 🔄 API代替戦略 | API障害時の対応策 | [API_FALLBACK_STRATEGY.md](./API_FALLBACK_STRATEGY.md) |
-| 🔧 引き継ぎ手順 | 開発者向け引き継ぎ情報 | [HANDOFF_INSTRUCTIONS.md](./HANDOFF_INSTRUCTIONS.md) |
+### 🚀 開発・運用関連
+| ドキュメント | 内容 | ステータス |
+|------------|------|----------|
+| [🛠️ 開発ガイド](./DEVELOPMENT_GUIDE.md) | **ローカル開発・認証バイパス・デバッグ手順** | ✅ 最新 |
+| [🚀 デプロイガイド](./DEPLOYMENT_GUIDE.md) | **GitHub Actions自動デプロイ・VPS運用** | ✅ 最新 |
+| [⚡ Claude開発コマンド](./CLAUDE.md) | **Claude Code用コマンドリファレンス** | ✅ 最新 |
+| [📋 デプロイ仕様書](./DEPLOYMENT_SPECIFICATION.md) | デプロイメント技術仕様 | 🔄 要更新 |
+
+### 📖 技術・仕様関連  
+| ドキュメント | 内容 | ステータス |
+|------------|------|----------|
+| [📖 技術仕様書](./TECHNICAL_SPECIFICATION_V2.md) | **システム全体の技術詳細** | ✅ 最新 |
+| [📈 TORB戦略詳細](./tokyo_box_strategy_spec.md) | **東京ボックス戦略の完全仕様** | ✅ 最新 |
+| [🔄 API代替戦略](./API_FALLBACK_STRATEGY.md) | API障害時の対応策 | ✅ 最新 |
+| [⚠️ コンプライアンス](./COMPLIANCE_AND_REQUIREMENTS.md) | 法的要件・規制対応 | ✅ 最新 |
+
+### 💼 ビジネス・マーケティング
+| ドキュメント | 内容 | ステータス |  
+|------------|------|----------|
+| [💼 TORB戦略LP](./tokyo_box_strategy_lp.md) | マーケティング・説明資料 | ✅ 最新 |
+| [📊 ビジネス仕様書](./BUSINESS_PLAN_SPECIFICATION.md) | 収益化・会員制度設計 | ✅ 最新 |
+| [🔧 引き継ぎ手順](./HANDOFF_INSTRUCTIONS.md) | 開発者向け引き継ぎ情報 | 🔄 要更新 |
 
 ## Phase 1 データ収集システム完了 ✅
 
@@ -130,40 +143,39 @@ fx-sign01/
 
 ## ⚡ クイックスタート
 
-### 🖥️ ローカル開発環境
+### 🖥️ ローカル開発環境 (認証バイパス対応)
 
 ```bash
-# フロントエンド開発
+# フロントエンド開発 (認証バイパス自動適用)
 cd frontend
 npm install
 npm run dev
-# → http://localhost:5173
+# → http://localhost:5173 (OAuth不要でログイン済み状態)
 
-# バックエンド開発 (別ターミナル)
+# バックエンド開発 (別ターミナル)  
 cd backend
 npm install
 npm run dev
-# → http://localhost:3001
+# → http://localhost:3002 (開発用エンドポイント有効)
 ```
 
-### 🚀 本番デプロイ
+**🔐 開発用認証バイパス**: 
+- `NODE_ENV=development` で自動有効
+- モックユーザー（PRO会員）で全機能利用可能
+- 本番環境では完全無効（セキュリティ保証）
+
+### 🚀 本番デプロイ (GitHub Actions自動化)
 
 ```bash
-# 1. VPSにSSH接続
+# 推奨：自動デプロイ
+git push origin main  # GitHub Actions が自動実行
+
+# 手動デプロイ（緊急時のみ）
 ssh root@46.250.250.63
-
-# 2. アプリケーション更新
-cd /var/www/fx-sign01
-git pull origin main
-
-# 3. バックエンド再起動
-cd backend && npm install && pm2 restart fxsign
-
-# 4. フロントエンド更新
-cd ../frontend && npm install && npm run build
+cd /var/www/fx-sign01 && ./deploy.sh
 ```
 
-詳細なデプロイ手順は [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) を参照してください。
+**📖 詳細ガイド**: [開発ガイド](./DEVELOPMENT_GUIDE.md) | [デプロイガイド](./DEPLOYMENT_GUIDE.md)
 
 ## TORBストラテジー詳細
 
@@ -324,6 +336,14 @@ SEO・集客重視:
 Private Project - 商用利用禁止
 
 ## 📅 更新履歴
+
+### v2.3.0 (2025-09-07) - GitHub Actions CI/CD + 開発環境整備 🚀
+- ✅ **GitHub Actions CI/CD**: 完全自動デプロイパイプライン構築
+- ✅ **品質ゲート**: ESLint, TypeScript, テスト自動実行
+- ✅ **ゼロダウンタイムデプロイ**: PM2 + SSH自動デプロイ
+- ✅ **開発用認証バイパス**: ローカル開発効率化機能
+- ✅ **ドキュメント整備**: 開発ガイド・デプロイガイド・Claude Code対応
+- ✅ **セキュリティ保証**: NODE_ENV厳密チェック・本番環境影響ゼロ
 
 ### v2.2.0 (2025-09-07) - Phase 1 データ収集システム完了 🎯
 - ✅ **パフォーマンス追跡データベース**: PostgreSQL本番環境完全構築
