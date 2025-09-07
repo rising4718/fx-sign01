@@ -45,9 +45,31 @@
 - 🗄️ **データ**: 蓄積・統計表示準備完了
 - 📊 **商用化**: 技術的準備完了
 
-## 🚀 PM2統一デプロイ手順 (2025-09-07更新)
+## 🚀 GitHub Actions 自動デプロイ (2025-09-07導入)
 
-### ⚡ クイックデプロイ（推奨）
+### ⚡ 推奨デプロイ方法: GitHub Actions
+
+**最新の推奨手順**：
+```bash
+# ローカルで変更をコミット・プッシュするだけ
+git add .
+git commit -m "機能追加: xxx"
+git push origin main
+```
+
+**自動実行内容**：
+- ✅ ESLint による品質チェック
+- ✅ TypeScript コンパイルチェック  
+- ✅ テスト実行（設定済みの場合）
+- ✅ 本番サーバーへ自動デプロイ
+- ✅ PM2によるゼロダウンタイム再起動
+- ✅ ヘルスチェック実行
+- ✅ デプロイ結果通知
+
+**デプロイ監視**：
+- https://github.com/rising4718/fx-sign01/actions
+
+### 🔧 手動デプロイ（緊急時のみ）
 
 ```bash
 # VPSにSSH接続
@@ -249,15 +271,22 @@ pm2 monit                     # リアルタイム監視
 ### 自動化デプロイコマンド
 
 ```bash
-# 本番デプロイ（GitHubワークフロー準拠）
-cd /var/www/fx-sign01 && ./deploy.sh
+# ✅ 推奨: GitHub Actions自動デプロイ
+git push origin main  # これだけで自動デプロイ実行
 
-# 手動プロセス管理（非推奨）
-pm2 kill && cd /var/www/fx-sign01/backend && PORT=3002 npm start &
+# 緊急時の手動デプロイ
+cd /var/www/fx-sign01 && ./deploy.sh
 
 # ヘルスチェック
 curl https://fxbuybuy.site/api/health
 ```
+
+### GitHub Actions設定済み内容
+
+- **ワークフローファイル**: `.github/workflows/deploy.yml`
+- **SSH認証**: 自動デプロイ用の秘密鍵設定済み
+- **品質チェック**: ESLint, TypeScript, テスト実行
+- **デプロイ監視**: GitHub Actionsタブでリアルタイム確認可能
 
 ### システム監視
 
