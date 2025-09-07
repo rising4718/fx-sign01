@@ -70,7 +70,9 @@ app.get('/api/health', (req, res) => {
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     environment: process.env.NODE_ENV || 'development',
-    service: 'FX Sign Backend API'
+    service: 'FX Sign Backend API',
+    version: '1.0.1',
+    deployment: 'PM2 Unified Deployment System'
   });
 });
 
