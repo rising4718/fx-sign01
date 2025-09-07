@@ -5,13 +5,36 @@
  */
 
 import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from 'jsonwebtoken';
 import crypto from 'crypto';
 import { Pool } from 'pg';
 import { JWT_CONFIG, PASSWORD_CONFIG } from '../config/jwt';
 
-// データベース接続（既存のものを使用予定）
-let db: Pool;
+// データベース接続プール（遅延初期化）
+let db: Pool | null = null;
+
+const getDb = (): Pool => {
+  if (!db) {
+    console.log('Initializing DB connection with config:', {
+      host: process.env.DB_HOST || 'localhost',
+      port: parseInt(process.env.DB_PORT || '5432'),
+      database: process.env.DB_NAME || 'fx_sign_db',
+      user: process.env.DB_USER || 'fxuser',
+    });
+
+    db = new Pool({
+      host: process.env.DB_HOST || 'localhost',
+      port: parseInt(process.env.DB_PORT || '5432'),
+      database: process.env.DB_NAME || 'fx_sign_db',
+      user: process.env.DB_USER || 'fxuser',
+      password: process.env.DB_PASSWORD || 'fxpass123',
+      max: 20,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 2000,
+    });
+  }
+  return db!; // Non-null assertion since we just created it
+};
 
 // ユーザー型定義
 export interface User {
@@ -40,12 +63,12 @@ export interface TokenPair {
   refreshToken: string;
 }
 
-/**
- * データベース接続設定
- */
-export const setDatabase = (database: Pool) => {
-  db = database;
-};
+export interface AuthResult {
+  user: User;
+  tokens: TokenPair;
+}
+
+// データベース接続設定は上記のconstで自動設定済み
 
 /**
  * パスワードハッシュ化
@@ -72,8 +95,8 @@ export const generateAccessToken = (user: User): string => {
     displayName: user.displayName
   };
 
-  return jwt.sign(payload, JWT_CONFIG.ACCESS_TOKEN_SECRET, {
-    expiresIn: JWT_CONFIG.ACCESS_TOKEN_EXPIRES
+  return jwt.sign(payload, JWT_CONFIG.ACCESS_TOKEN_SECRET, { 
+    expiresIn: '15m' 
   });
 };
 
@@ -85,13 +108,37 @@ export const generateRefreshToken = (): string => {
 };
 
 /**
+ * アクセストークンとリフレッシュトークンのペア生成
+ * リフレッシュトークンはデータベースに保存される
+ */
+export const generateTokens = async (user: User): Promise<TokenPair> => {
+  const accessToken = generateAccessToken(user);
+  const refreshToken = generateRefreshToken();
+
+  // リフレッシュトークンをデータベースに保存
+  await getDb().query(`
+    INSERT INTO user_sessions (user_id, refresh_token, expires_at)
+    VALUES ($1, $2, $3)
+  `, [
+    user.id,
+    refreshToken,
+    new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7日後
+  ]);
+
+  return {
+    accessToken,
+    refreshToken
+  };
+};
+
+/**
  * ユーザー登録
  */
-export const registerUser = async (userData: CreateUserData): Promise<User> => {
+export const registerUser = async (userData: CreateUserData): Promise<AuthResult> => {
   const { email, password, displayName } = userData;
 
   // メール重複チェック
-  const existingUser = await db.query(
+  const existingUser = await getDb().query(
     'SELECT id FROM users WHERE email = $1',
     [email]
   );
@@ -112,14 +159,14 @@ export const registerUser = async (userData: CreateUserData): Promise<User> => {
   const emailVerificationToken = crypto.randomBytes(32).toString('hex');
 
   // ユーザー作成
-  const result = await db.query(`
+  const result = await getDb().query(`
     INSERT INTO users (email, password_hash, display_name, email_verification_token)
     VALUES ($1, $2, $3, $4)
     RETURNING id, email, display_name, plan_type, is_email_verified, created_at
   `, [email, passwordHash, displayName, emailVerificationToken]);
 
   const user = result.rows[0];
-  return {
+  const userObj = {
     id: user.id,
     email: user.email,
     displayName: user.display_name,
@@ -127,16 +174,24 @@ export const registerUser = async (userData: CreateUserData): Promise<User> => {
     isEmailVerified: user.is_email_verified,
     createdAt: user.created_at
   };
+
+  // トークン生成
+  const tokens = await generateTokens(userObj);
+
+  return {
+    user: userObj,
+    tokens
+  };
 };
 
 /**
  * ユーザーログイン
  */
-export const loginUser = async (loginData: LoginData): Promise<{ user: User; tokens: TokenPair }> => {
+export const loginUser = async (loginData: LoginData): Promise<AuthResult> => {
   const { email, password } = loginData;
 
   // ユーザー取得
-  const result = await db.query(`
+  const result = await getDb().query(`
     SELECT id, email, password_hash, display_name, plan_type, is_email_verified, created_at
     FROM users WHERE email = $1
   `, [email]);
@@ -167,7 +222,7 @@ export const loginUser = async (loginData: LoginData): Promise<{ user: User; tok
   const refreshToken = generateRefreshToken();
 
   // リフレッシュトークンをデータベースに保存
-  await db.query(`
+  await getDb().query(`
     INSERT INTO user_sessions (user_id, refresh_token, expires_at)
     VALUES ($1, $2, $3)
   `, [
@@ -177,7 +232,7 @@ export const loginUser = async (loginData: LoginData): Promise<{ user: User; tok
   ]);
 
   // 最終ログイン更新
-  await db.query(
+  await getDb().query(
     'UPDATE users SET last_login = NOW() WHERE id = $1',
     [user.id]
   );
@@ -193,7 +248,7 @@ export const loginUser = async (loginData: LoginData): Promise<{ user: User; tok
  */
 export const refreshAccessToken = async (refreshToken: string): Promise<TokenPair> => {
   // リフレッシュトークン検証
-  const result = await db.query(`
+  const result = await getDb().query(`
     SELECT us.user_id, u.email, u.display_name, u.plan_type, u.is_email_verified, u.created_at
     FROM user_sessions us
     JOIN users u ON us.user_id = u.id
@@ -219,8 +274,8 @@ export const refreshAccessToken = async (refreshToken: string): Promise<TokenPai
   const newRefreshToken = generateRefreshToken();
 
   // 古いリフレッシュトークンを削除し、新しいものを保存
-  await db.query('DELETE FROM user_sessions WHERE refresh_token = $1', [refreshToken]);
-  await db.query(`
+  await getDb().query('DELETE FROM user_sessions WHERE refresh_token = $1', [refreshToken]);
+  await getDb().query(`
     INSERT INTO user_sessions (user_id, refresh_token, expires_at)
     VALUES ($1, $2, $3)
   `, [
@@ -239,14 +294,14 @@ export const refreshAccessToken = async (refreshToken: string): Promise<TokenPai
  * ログアウト（リフレッシュトークン削除）
  */
 export const logoutUser = async (refreshToken: string): Promise<void> => {
-  await db.query('DELETE FROM user_sessions WHERE refresh_token = $1', [refreshToken]);
+  await getDb().query('DELETE FROM user_sessions WHERE refresh_token = $1', [refreshToken]);
 };
 
 /**
  * ユーザー情報取得
  */
 export const getUserById = async (userId: number): Promise<User | null> => {
-  const result = await db.query(`
+  const result = await getDb().query(`
     SELECT id, email, display_name, plan_type, is_email_verified, created_at, last_login
     FROM users WHERE id = $1
   `, [userId]);

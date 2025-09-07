@@ -1,6 +1,6 @@
 import React from 'react';
-import { Layout, Typography, Menu, Space, Tag } from 'antd';
-import { Link, useLocation } from 'react-router-dom';
+import { Layout, Typography, Menu, Space, Tag, Button } from 'antd';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   HomeOutlined,
   BarChartOutlined,
@@ -9,9 +9,12 @@ import {
   DollarOutlined,
   ControlOutlined,
   RocketOutlined,
-  DashboardOutlined
+  DashboardOutlined,
+  LoginOutlined
 } from '@ant-design/icons';
 import TradingModeToggle from './TradingModeToggle';
+import UserProfile from './UserProfile';
+import { useAuth } from '../contexts/AuthContext';
 
 const { Header } = Layout;
 const { Title, Text } = Typography;
@@ -31,6 +34,8 @@ const AntHeader: React.FC<AntHeaderProps> = ({
   sessionInfo
 }) => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   
   const menuItems = [
     {
@@ -128,6 +133,25 @@ const AntHeader: React.FC<AntHeaderProps> = ({
             </Text>
           )}
         </Space>
+        
+        {/* 認証状態に応じてユーザープロフィールまたはログインボタンを表示 */}
+        {isAuthenticated ? (
+          <UserProfile />
+        ) : (
+          <Button 
+            type="primary" 
+            icon={<LoginOutlined />}
+            size="small"
+            onClick={() => navigate('/login')}
+            style={{
+              height: '28px',
+              fontSize: '12px',
+              borderRadius: '4px'
+            }}
+          >
+            ログイン
+          </Button>
+        )}
       </div>
     </Header>
   );

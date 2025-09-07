@@ -32,30 +32,33 @@ interface JWTPayload {
  * JWT トークン認証ミドルウェア
  * Authorization: Bearer <token> ヘッダーからトークンを取得し検証
  */
-export const authenticateToken = (req: AuthRequest, res: Response, next: NextFunction) => {
+export const authenticateToken = (req: AuthRequest, res: Response, next: NextFunction): void => {
   try {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
     if (!token) {
-      return res.status(401).json({ 
+      res.status(401).json({ 
         error: 'Access token required',
         code: 'NO_TOKEN' 
       });
+      return;
     }
 
     jwt.verify(token, JWT_CONFIG.ACCESS_TOKEN_SECRET, (err, decoded) => {
       if (err) {
         if (err.name === 'TokenExpiredError') {
-          return res.status(401).json({ 
+          res.status(401).json({ 
             error: 'Access token expired',
             code: 'TOKEN_EXPIRED' 
           });
+          return;
         }
-        return res.status(403).json({ 
+        res.status(403).json({ 
           error: 'Invalid access token',
           code: 'INVALID_TOKEN' 
         });
+        return;
       }
 
       const payload = decoded as JWTPayload;
@@ -70,10 +73,11 @@ export const authenticateToken = (req: AuthRequest, res: Response, next: NextFun
     });
   } catch (error) {
     console.error('Authentication middleware error:', error);
-    return res.status(500).json({ 
+    res.status(500).json({ 
       error: 'Internal server error',
       code: 'AUTH_ERROR' 
     });
+    return;
   }
 };
 
@@ -82,12 +86,13 @@ export const authenticateToken = (req: AuthRequest, res: Response, next: NextFun
  * 指定されたプラン以上のユーザーのみアクセス許可
  */
 export const requirePlan = (requiredPlan: 'free' | 'premium' | 'pro') => {
-  return (req: AuthRequest, res: Response, next: NextFunction) => {
+  return (req: AuthRequest, res: Response, next: NextFunction): void => {
     if (!req.user) {
-      return res.status(401).json({ 
+      res.status(401).json({ 
         error: 'Authentication required',
         code: 'NOT_AUTHENTICATED' 
       });
+      return;
     }
 
     const planHierarchy = { 'free': 0, 'premium': 1, 'pro': 2 };
@@ -95,12 +100,13 @@ export const requirePlan = (requiredPlan: 'free' | 'premium' | 'pro') => {
     const requiredLevel = planHierarchy[requiredPlan];
 
     if (userLevel < requiredLevel) {
-      return res.status(403).json({ 
+      res.status(403).json({ 
         error: `${requiredPlan} plan required`,
         code: 'INSUFFICIENT_PLAN',
         userPlan: req.user.planType,
         requiredPlan 
       });
+      return;
     }
 
     next();

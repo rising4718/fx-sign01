@@ -9,14 +9,18 @@ const cors_1 = __importDefault(require("cors"));
 const helmet_1 = __importDefault(require("helmet"));
 const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
 const dotenv_1 = __importDefault(require("dotenv"));
+const cookie_parser_1 = __importDefault(require("cookie-parser"));
 const ws_1 = require("ws");
 const fx_1 = require("./routes/fx");
 const torb_1 = require("./routes/torb");
+const performance_1 = require("./routes/performance");
+const auth_1 = __importDefault(require("./routes/auth"));
 const websocketService_1 = require("./services/websocketService");
 const errorHandler_1 = require("./middleware/errorHandler");
 const logger_1 = require("./utils/logger");
 dotenv_1.default.config();
 const app = (0, express_1.default)();
+app.set('trust proxy', 1);
 const server = http_1.default.createServer(app);
 const wss = new ws_1.WebSocketServer({ server });
 app.use((0, helmet_1.default)());
@@ -36,6 +40,7 @@ const limiter = (0, express_rate_limit_1.default)({
 app.use(limiter);
 app.use(express_1.default.json({ limit: '10mb' }));
 app.use(express_1.default.urlencoded({ extended: true, limit: '10mb' }));
+app.use((0, cookie_parser_1.default)());
 app.get('/health', (req, res) => {
     res.status(200).json({
         status: 'OK',
@@ -46,6 +51,8 @@ app.get('/health', (req, res) => {
 });
 app.use('/api/v1/fx', fx_1.fxRoutes);
 app.use('/api/v1/torb', torb_1.torbRoutes);
+app.use('/api/v1/performance', performance_1.performanceRoutes);
+app.use('/api/auth', auth_1.default);
 (0, websocketService_1.setupWebSocket)(wss);
 app.use(errorHandler_1.errorHandler);
 app.use('*', (req, res) => {

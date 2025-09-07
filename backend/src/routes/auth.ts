@@ -7,13 +7,14 @@
 import express, { Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import { body, validationResult } from 'express-validator';
-// import { 
-//   registerUser, 
-//   loginUser, 
-//   refreshAccessToken, 
-//   logoutUser, 
-//   getUserById 
-// } from '../services/authService';
+import { 
+  registerUser, 
+  loginUser, 
+  refreshAccessToken, 
+  logoutUser, 
+  getUserById,
+  AuthResult
+} from '../services/authService';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 import { RATE_LIMIT_CONFIG } from '../config/jwt';
 
@@ -69,6 +70,8 @@ const loginValidation = [
  */
 router.post('/register', registerLimiter, registerValidation, async (req: Request, res: Response): Promise<void> => {
   try {
+    console.log('Registration request received:', req.body);
+    
     // バリデーション結果チェック
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -80,25 +83,36 @@ router.post('/register', registerLimiter, registerValidation, async (req: Reques
       return;
     }
 
-    // const { email, password, displayName } = req.body;
+    const { email, password, displayName } = req.body;
 
-    // // ユーザー登録
-    // const user = await registerUser({
-    //   email,
-    //   password,
-    //   displayName
-    // });
+    // ユーザー登録処理
+    const { user, tokens } = await registerUser({
+      email,
+      password,
+      displayName
+    });
+
+    // HTTPOnly Cookie でリフレッシュトークンを送信
+    res.cookie('refreshToken', tokens.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7日
+    });
 
     res.status(201).json({
-      message: 'User registration endpoint - Implementation pending',
-      // user: {
-      //   id: user.id,
-      //   email: user.email,
-      //   displayName: user.displayName,
-      //   planType: user.planType,
-      //   isEmailVerified: user.isEmailVerified
-      // }
+      message: 'User registered successfully',
+      user: {
+        id: user.id,
+        email: user.email,
+        displayName: user.displayName,
+        planType: user.planType,
+        isEmailVerified: user.isEmailVerified
+      },
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken
     });
+    return;
 
   } catch (error: any) {
     console.error('Registration error:', error);
@@ -115,6 +129,7 @@ router.post('/register', registerLimiter, registerValidation, async (req: Reques
       error: 'Registration failed',
       code: 'REGISTRATION_ERROR'
     });
+    return;
   }
 });
 
@@ -135,30 +150,32 @@ router.post('/login', loginLimiter, loginValidation, async (req: Request, res: R
       return;
     }
 
-    // const { email, password } = req.body;
+    const { email, password } = req.body;
 
-    // // ログイン処理
-    // const { user, tokens } = await loginUser({ email, password });
+    // ログイン処理
+    const { user, tokens } = await loginUser({ email, password });
 
-    // // HTTPOnly Cookie でリフレッシュトークンを送信
-    // res.cookie('refreshToken', tokens.refreshToken, {
-    //   httpOnly: true,
-    //   secure: process.env.NODE_ENV === 'production',
-    //   sameSite: 'strict',
-    //   maxAge: 7 * 24 * 60 * 60 * 1000 // 7日
-    // });
+    // HTTPOnly Cookie でリフレッシュトークンを送信
+    res.cookie('refreshToken', tokens.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7日
+    });
 
     res.json({
-      message: 'Login endpoint - Implementation pending',
-      // user: {
-      //   id: user.id,
-      //   email: user.email,
-      //   displayName: user.displayName,
-      //   planType: user.planType,
-      //   isEmailVerified: user.isEmailVerified
-      // },
-      // accessToken: tokens.accessToken
+      message: 'Login successful',
+      user: {
+        id: user.id,
+        email: user.email,
+        displayName: user.displayName,
+        planType: user.planType,
+        isEmailVerified: user.isEmailVerified
+      },
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken
     });
+    return;
 
   } catch (error: any) {
     console.error('Login error:', error);
@@ -175,6 +192,7 @@ router.post('/login', loginLimiter, loginValidation, async (req: Request, res: R
       error: 'Login failed',
       code: 'LOGIN_ERROR'
     });
+    return;
   }
 });
 
@@ -194,21 +212,23 @@ router.post('/refresh', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // // トークン更新
-    // const tokens = await refreshAccessToken(refreshToken);
+    // トークン更新
+    const tokens = await refreshAccessToken(refreshToken);
 
-    // // 新しいリフレッシュトークンをCookieに設定
-    // res.cookie('refreshToken', tokens.refreshToken, {
-    //   httpOnly: true,
-    //   secure: process.env.NODE_ENV === 'production',
-    //   sameSite: 'strict',
-    //   maxAge: 7 * 24 * 60 * 60 * 1000
-    // });
+    // 新しいリフレッシュトークンをCookieに設定
+    res.cookie('refreshToken', tokens.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000
+    });
 
     res.json({
-      message: 'Token refresh endpoint - Implementation pending',
-      // accessToken: tokens.accessToken
+      message: 'Token refreshed successfully',
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken
     });
+    return;
 
   } catch (error: any) {
     console.error('Token refresh error:', error);
@@ -220,6 +240,7 @@ router.post('/refresh', async (req: Request, res: Response): Promise<void> => {
       error: 'Invalid or expired refresh token',
       code: 'INVALID_REFRESH_TOKEN'
     });
+    return;
   }
 });
 
@@ -233,7 +254,7 @@ router.post('/logout', async (req: Request, res: Response): Promise<void> => {
 
     if (refreshToken) {
       // リフレッシュトークンをデータベースから削除
-      // await logoutUser(refreshToken);
+      await logoutUser(refreshToken);
     }
 
     // Cookieクリア
@@ -242,6 +263,7 @@ router.post('/logout', async (req: Request, res: Response): Promise<void> => {
     res.json({
       message: 'Logout successful'
     });
+    return;
 
   } catch (error) {
     console.error('Logout error:', error);
@@ -252,6 +274,7 @@ router.post('/logout', async (req: Request, res: Response): Promise<void> => {
     res.json({
       message: 'Logout completed'
     });
+    return;
   }
 });
 
@@ -269,29 +292,30 @@ router.get('/profile', authenticateToken, async (req: AuthRequest, res: Response
       return;
     }
 
-    // // 最新のユーザー情報を取得
-    // const user = await getUserById(req.user.id);
+    // 最新のユーザー情報を取得
+    const user = await getUserById(req.user.id);
     
-    // if (!user) {
-    //   return res.status(404).json({
-    //     error: 'User not found',
-    //     code: 'USER_NOT_FOUND'
-    //   });
-    // }
+    if (!user) {
+      res.status(404).json({
+        error: 'User not found',
+        code: 'USER_NOT_FOUND'
+      });
+      return;
+    }
 
     res.json({
-      message: 'Profile endpoint - Implementation pending',
-      user: req.user
-      // user: {
-      //   id: user.id,
-      //   email: user.email,
-      //   displayName: user.displayName,
-      //   planType: user.planType,
-      //   isEmailVerified: user.isEmailVerified,
-      //   createdAt: user.createdAt,
-      //   lastLogin: user.lastLogin
-      // }
+      message: 'Profile fetched successfully',
+      user: {
+        id: user.id,
+        email: user.email,
+        displayName: user.displayName,
+        planType: user.planType,
+        isEmailVerified: user.isEmailVerified,
+        createdAt: user.createdAt,
+        lastLogin: user.lastLogin
+      }
     });
+    return;
 
   } catch (error) {
     console.error('Profile fetch error:', error);
@@ -299,6 +323,7 @@ router.get('/profile', authenticateToken, async (req: AuthRequest, res: Response
       error: 'Failed to fetch profile',
       code: 'PROFILE_ERROR'
     });
+    return;
   }
 });
 
@@ -345,6 +370,7 @@ router.put('/profile', authenticateToken, [
         displayName
       }
     });
+    return;
 
   } catch (error) {
     console.error('Profile update error:', error);
@@ -352,6 +378,7 @@ router.put('/profile', authenticateToken, [
       error: 'Failed to update profile',
       code: 'PROFILE_UPDATE_ERROR'
     });
+    return;
   }
 });
 

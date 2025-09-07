@@ -10,7 +10,7 @@ import { WebSocketServer } from 'ws';
 import { fxRoutes } from './routes/fx';
 import { torbRoutes } from './routes/torb';
 import { performanceRoutes } from './routes/performance';
-// import authRoutes from './routes/auth';
+import authRoutes from './routes/auth';
 import { setupWebSocket } from './services/websocketService';
 import { errorHandler } from './middleware/errorHandler';
 import { logger } from './utils/logger';
@@ -18,7 +18,12 @@ import { logger } from './utils/logger';
 // Load environment variables
 dotenv.config();
 
+
 const app = express();
+
+// Trust proxy for Nginx reverse proxy
+app.set('trust proxy', 1);
+
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
@@ -62,7 +67,7 @@ app.get('/health', (req, res) => {
 app.use('/api/v1/fx', fxRoutes);
 app.use('/api/v1/torb', torbRoutes);
 app.use('/api/v1/performance', performanceRoutes);
-// app.use('/api/auth', authRoutes);
+app.use('/api/auth', authRoutes);
 
 // Setup WebSocket service
 setupWebSocket(wss);
