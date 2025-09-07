@@ -45,25 +45,39 @@
 - 🗄️ **データ**: 蓄積・統計表示準備完了
 - 📊 **商用化**: 技術的準備完了
 
-## 🚀 デプロイ手順
+## 🚀 PM2統一デプロイ手順 (2025-09-07更新)
 
-### Step 1: VPSにSSH接続
+### ⚡ クイックデプロイ（推奨）
 
 ```bash
+# VPSにSSH接続
 ssh root@46.250.250.63
-# パスワード: rise0077
+
+# 統一デプロイスクリプト実行
+cd /var/www/fx-sign01
+./deploy.sh
 ```
 
-### Step 2: サーバー初期設定
+### 📋 デプロイスクリプト詳細
 
-```bash
-# サーバーセットアップスクリプトをダウンロード
-wget https://raw.githubusercontent.com/your-repo/fx-sign01/main/deploy-server-setup.sh
-chmod +x deploy-server-setup.sh
-./deploy-server-setup.sh
-```
+**deploy.sh** が以下を自動実行：
+1. GitHubから最新コード取得 (`git pull origin main`)
+2. バックエンドビルド (`backend/npm run build`)
+3. フロントエンドビルド (`frontend/npm run build`)
+4. PM2でゼロダウンタイム再起動 (`pm2 reload fx-sign-backend`)
+5. ヘルスチェック実行 (`curl https://fxbuybuy.site/api/health`)
 
-または手動で以下を実行：
+### 🔧 PM2設定
+
+**ecosystem.config.js** 設定済み：
+- プロセス名: `fx-sign-backend`
+- ポート: `3002` (Nginx→Backend)
+- メモリ制限: `512M`
+- 自動再起動: `有効`
+- ログ管理: `/var/log/pm2/`
+- 環境変数: 本番用設定済み
+
+### 🛠️ 初回セットアップ（既に完了済み）
 
 ```bash
 # システム更新
@@ -75,6 +89,8 @@ apt-get install -y nodejs
 
 # 必要パッケージインストール
 apt install -y nginx postgresql postgresql-contrib ufw git
+
+# PM2をグローバルインストール（既に完了済み）
 npm install -g pm2
 
 # サービス開始
@@ -218,14 +234,29 @@ SESSION_SECRET=your_super_secret_session_key_here
 
 ## 📊 運用・監視
 
-### PM2コマンド
+### PM2コマンド（2025-09-07更新）
 
 ```bash
-pm2 status          # アプリ状態確認
-pm2 logs fxsign     # ログ確認
-pm2 restart fxsign  # アプリ再起動
-pm2 stop fxsign     # アプリ停止
-pm2 delete fxsign   # アプリ削除
+pm2 status                    # アプリ状態確認
+pm2 logs fx-sign-backend      # ログ確認
+pm2 reload fx-sign-backend    # ゼロダウンタイム再起動（推奨）
+pm2 restart fx-sign-backend   # 通常再起動
+pm2 stop fx-sign-backend      # アプリ停止
+pm2 delete fx-sign-backend    # アプリ削除
+pm2 monit                     # リアルタイム監視
+```
+
+### 自動化デプロイコマンド
+
+```bash
+# 本番デプロイ（GitHubワークフロー準拠）
+cd /var/www/fx-sign01 && ./deploy.sh
+
+# 手動プロセス管理（非推奨）
+pm2 kill && cd /var/www/fx-sign01/backend && PORT=3002 npm start &
+
+# ヘルスチェック
+curl https://fxbuybuy.site/api/health
 ```
 
 ### システム監視
