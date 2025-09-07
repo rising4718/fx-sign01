@@ -75,8 +75,9 @@ router.post('/register', registerLimiter, registerValidation, async (req: Reques
     // バリデーション結果チェック
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      const errorMessages = errors.array().map(err => err.msg).join(', ');
       res.status(400).json({
-        error: 'Validation failed',
+        error: errorMessages,
         code: 'VALIDATION_ERROR',
         details: errors.array()
       });
@@ -142,8 +143,9 @@ router.post('/login', loginLimiter, loginValidation, async (req: Request, res: R
     // バリデーション結果チェック
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      const errorMessages = errors.array().map(err => err.msg).join(', ');
       res.status(400).json({
-        error: 'Validation failed',
+        error: errorMessages,
         code: 'VALIDATION_ERROR',
         details: errors.array()
       });
@@ -350,8 +352,9 @@ router.put('/profile', authenticateToken, [
     // バリデーション結果チェック
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      const errorMessages = errors.array().map(err => err.msg).join(', ');
       res.status(400).json({
-        error: 'Validation failed',
+        error: errorMessages,
         code: 'VALIDATION_ERROR',
         details: errors.array()
       });

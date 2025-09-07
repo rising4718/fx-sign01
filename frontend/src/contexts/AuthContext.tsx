@@ -198,7 +198,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return true;
       } else {
         const errorData = await response.json();
-        message.error(errorData.error || '登録に失敗しました');
+        if (errorData.details && errorData.details.length > 0) {
+          const detailedErrors = errorData.details.map((err: any) => err.msg).join('\n');
+          message.error(detailedErrors);
+        } else {
+          message.error(errorData.error || '登録に失敗しました');
+        }
         return false;
       }
     } catch (error) {

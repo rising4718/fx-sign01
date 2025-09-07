@@ -53,8 +53,9 @@ router.post('/register', registerLimiter, registerValidation, async (req, res) =
         console.log('Registration request received:', req.body);
         const errors = (0, express_validator_1.validationResult)(req);
         if (!errors.isEmpty()) {
+            const errorMessages = errors.array().map(err => err.msg).join(', ');
             res.status(400).json({
-                error: 'Validation failed',
+                error: errorMessages,
                 code: 'VALIDATION_ERROR',
                 details: errors.array()
             });
@@ -106,8 +107,9 @@ router.post('/login', loginLimiter, loginValidation, async (req, res) => {
     try {
         const errors = (0, express_validator_1.validationResult)(req);
         if (!errors.isEmpty()) {
+            const errorMessages = errors.array().map(err => err.msg).join(', ');
             res.status(400).json({
-                error: 'Validation failed',
+                error: errorMessages,
                 code: 'VALIDATION_ERROR',
                 details: errors.array()
             });
@@ -263,8 +265,9 @@ router.put('/profile', auth_1.authenticateToken, [
         }
         const errors = (0, express_validator_1.validationResult)(req);
         if (!errors.isEmpty()) {
+            const errorMessages = errors.array().map(err => err.msg).join(', ');
             res.status(400).json({
-                error: 'Validation failed',
+                error: errorMessages,
                 code: 'VALIDATION_ERROR',
                 details: errors.array()
             });
