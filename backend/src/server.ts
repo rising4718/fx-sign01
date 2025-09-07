@@ -9,7 +9,8 @@ import { WebSocketServer } from 'ws';
 
 import { fxRoutes } from './routes/fx';
 import { torbRoutes } from './routes/torb';
-import authRoutes from './routes/auth';
+import { performanceRoutes } from './routes/performance';
+// import authRoutes from './routes/auth';
 import { setupWebSocket } from './services/websocketService';
 import { errorHandler } from './middleware/errorHandler';
 import { logger } from './utils/logger';
@@ -60,7 +61,8 @@ app.get('/health', (req, res) => {
 // API routes
 app.use('/api/v1/fx', fxRoutes);
 app.use('/api/v1/torb', torbRoutes);
-app.use('/api/auth', authRoutes);
+app.use('/api/v1/performance', performanceRoutes);
+// app.use('/api/auth', authRoutes);
 
 // Setup WebSocket service
 setupWebSocket(wss);
