@@ -8,7 +8,8 @@ import {
   FileTextOutlined,
   DollarOutlined,
   ControlOutlined,
-  RocketOutlined
+  RocketOutlined,
+  DashboardOutlined
 } from '@ant-design/icons';
 import TradingModeToggle from './TradingModeToggle';
 
@@ -56,6 +57,11 @@ const AntHeader: React.FC<AntHeaderProps> = ({
       key: '/results',
       icon: <FileTextOutlined />,
       label: <Link to="/results">取引結果</Link>
+    },
+    {
+      key: '/performance',
+      icon: <DashboardOutlined />,
+      label: <Link to="/performance">パフォーマンス</Link>
     },
     {
       key: '/release-notes',
