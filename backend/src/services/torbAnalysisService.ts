@@ -2,6 +2,14 @@ import { logger } from '../utils/logger';
 import { TORBRange, TORBSignal, CandleData } from '../types';
 import { FXDataService } from './fxDataService';
 import { uuidv4 } from '../utils/uuid';
+import { 
+  calculateATR, 
+  calculateRSI, 
+  findSwingLevels,
+  getCurrentSession,
+  priceToPips,
+  pipsToPrice 
+} from '../utils/technicalIndicators';
 
 export class TORBAnalysisService {
   private fxDataService: FXDataService;
@@ -45,42 +53,9 @@ export class TORBAnalysisService {
     return (hour === 9 && minute >= 45) || (hour === 10) || (hour === 11 && minute === 0);
   }
 
-  private calculateRSI(prices: number[], period: number = 14): number {
-    if (prices.length < period + 1) {
-      return 50; // neutral RSI if not enough data
-    }
+  // RSI calculation moved to technicalIndicators.ts
 
-    const gains: number[] = [];
-    const losses: number[] = [];
-
-    // Calculate price changes
-    for (let i = 1; i < prices.length; i++) {
-      const change = prices[i] - prices[i - 1];
-      gains.push(change > 0 ? change : 0);
-      losses.push(change < 0 ? Math.abs(change) : 0);
-    }
-
-    // Calculate average gains and losses
-    const avgGain = gains.slice(-period).reduce((sum, gain) => sum + gain, 0) / period;
-    const avgLoss = losses.slice(-period).reduce((sum, loss) => sum + loss, 0) / period;
-
-    if (avgLoss === 0) return 100;
-    
-    const rs = avgGain / avgLoss;
-    const rsi = 100 - (100 / (1 + rs));
-    
-    return parseFloat(rsi.toFixed(2));
-  }
-
-  private pipsToPrice(pips: number): number {
-    // For USD/JPY, 1 pip = 0.001
-    return pips * 0.001;
-  }
-
-  private priceToPips(priceChange: number): number {
-    // For USD/JPY, convert price change to pips
-    return priceChange / 0.001;
-  }
+  // Pips conversion moved to technicalIndicators.ts
 
   public async calculateTORBRange(symbol: string, date: string): Promise<TORBRange | null> {
     const jstDate = new Date(date + 'T09:00:00+09:00');
@@ -100,7 +75,7 @@ export class TORBAnalysisService {
       // Calculate high and low during range period
       const high = Math.max(...historicalData.map(candle => candle.high));
       const low = Math.min(...historicalData.map(candle => candle.low));
-      const rangePips = this.priceToPips(high - low);
+      const rangePips = priceToPips(high - low, symbol);
 
       const torbRange: TORBRange = {
         startTime: jstDate,
@@ -139,50 +114,85 @@ export class TORBAnalysisService {
     symbol: string, 
     range: TORBRange, 
     currentPrice: number,
-    rsi: number
+    rsi: number,
+    recentCandles: CandleData[]
   ): Promise<TORBSignal | null> {
     
-    // Check range width filter (15-50 pips)
-    if (range.range < 15 || range.range > 50) {
-      logger.debug(`Range width ${range.range} pips outside valid range (15-50 pips)`);
+    // Check range width filter (30-55 pips)
+    if (range.range < 30 || range.range > 55) {
+      logger.debug(`Range width ${range.range} pips outside valid range (30-55 pips)`);
       return null;
     }
+
+    // ATR calculation for dynamic SL/TP
+    const atr = calculateATR(recentCandles, 14);
+    const swingLevels = findSwingLevels(recentCandles, 3);
+    const session = getCurrentSession();
 
     let signalType: 'LONG' | 'SHORT' | null = null;
     let entryPrice = currentPrice;
     let targetPrice: number = 0;
     let stopLoss: number = 0;
 
+    // Enhanced RSI filter (45/55 thresholds)
+    const rsiLongOK = rsi >= 45;  // ニュートラル以上
+    const rsiShortOK = rsi <= 55; // ニュートラル以下
+
     // Check for breakout above range high (LONG signal)
-    if (currentPrice > range.high && rsi > 55) {
+    if (currentPrice > range.high && rsiLongOK) {
       signalType = 'LONG';
-      const breakoutPips = this.priceToPips(currentPrice - range.high);
-      targetPrice = currentPrice + (breakoutPips * 1.5 * 0.001); // 1.5x breakout distance
-      stopLoss = range.low - this.pipsToPrice(5); // Range low - 5 pips
       
-      logger.info(`LONG breakout detected: Price=${currentPrice}, Range High=${range.high}, RSI=${rsi}`);
+      // Structure-based SL with ATR fallback
+      let slPrice = swingLevels.swingLow;
+      if (!slPrice || Math.abs(currentPrice - slPrice) > atr * 2) {
+        slPrice = currentPrice - (atr * 1.5); // ATR fallback
+      }
+      
+      // Min/Max SL distance constraints
+      const minSL = currentPrice - pipsToPrice(60, symbol); // max 60 pips
+      const maxSL = currentPrice - pipsToPrice(15, symbol); // min 15 pips
+      stopLoss = Math.max(minSL, Math.min(maxSL, slPrice));
+      
+      // Session-based TP
+      const riskAmount = currentPrice - stopLoss;
+      targetPrice = currentPrice + (riskAmount * session.multiplier);
+      
+      logger.info(`LONG breakout detected: Price=${currentPrice}, SL=${stopLoss}, TP=${targetPrice}, ATR=${atr}, Session=${session.name}`);
     }
     // Check for breakout below range low (SHORT signal)
-    else if (currentPrice < range.low && rsi < 45) {
+    else if (currentPrice < range.low && rsiShortOK) {
       signalType = 'SHORT';
-      const breakoutPips = this.priceToPips(range.low - currentPrice);
-      targetPrice = currentPrice - (breakoutPips * 1.5 * 0.001); // 1.5x breakout distance
-      stopLoss = range.high + this.pipsToPrice(5); // Range high + 5 pips
       
-      logger.info(`SHORT breakout detected: Price=${currentPrice}, Range Low=${range.low}, RSI=${rsi}`);
+      // Structure-based SL with ATR fallback
+      let slPrice = swingLevels.swingHigh;
+      if (!slPrice || Math.abs(slPrice - currentPrice) > atr * 2) {
+        slPrice = currentPrice + (atr * 1.5); // ATR fallback
+      }
+      
+      // Min/Max SL distance constraints
+      const maxSL = currentPrice + pipsToPrice(60, symbol); // max 60 pips
+      const minSL = currentPrice + pipsToPrice(15, symbol); // min 15 pips
+      stopLoss = Math.min(maxSL, Math.max(minSL, slPrice));
+      
+      // Session-based TP
+      const riskAmount = stopLoss - currentPrice;
+      targetPrice = currentPrice - (riskAmount * session.multiplier);
+      
+      logger.info(`SHORT breakout detected: Price=${currentPrice}, SL=${stopLoss}, TP=${targetPrice}, ATR=${atr}, Session=${session.name}`);
     }
 
     if (!signalType) {
       return null;
     }
 
-    // Calculate confidence based on RSI strength and breakout strength
-    const rsiStrength = signalType === 'LONG' ? (rsi - 55) / 45 : (45 - rsi) / 45;
-    const breakoutStrength = signalType === 'LONG' ? 
-      this.priceToPips(currentPrice - range.high) / 10 : 
-      this.priceToPips(range.low - currentPrice) / 10;
+    // Enhanced confidence calculation
+    const riskRewardRatio = Math.abs(targetPrice - currentPrice) / Math.abs(stopLoss - currentPrice);
+    const atrStrength = atr / (range.range * 0.001); // ATR vs range size
+    const rsiStrength = signalType === 'LONG' ? 
+      Math.min(1, (rsi - 45) / 55) : 
+      Math.min(1, (55 - rsi) / 55);
     
-    const confidence = Math.min(0.95, Math.max(0.5, (rsiStrength + breakoutStrength) / 2));
+    const confidence = Math.min(0.95, Math.max(0.5, (riskRewardRatio + atrStrength + rsiStrength) / 3));
 
     const signal: TORBSignal = {
       id: uuidv4(),
@@ -194,7 +204,11 @@ export class TORBAnalysisService {
       range,
       rsi,
       confidence: parseFloat(confidence.toFixed(2)),
-      status: 'ACTIVE'
+      status: 'ACTIVE',
+      // 新しいフィールド
+      atr: parseFloat(atr.toFixed(5)),
+      session: session.name,
+      riskRewardRatio: parseFloat(riskRewardRatio.toFixed(2))
     };
 
     return signal;
@@ -221,10 +235,10 @@ export class TORBAnalysisService {
       try {
         const currentPrice = await this.fxDataService.getCurrentPrice(symbol);
         
-        // Get recent price data for RSI calculation
+        // Get recent price data for RSI and ATR calculation
         const recentData = await this.fxDataService.getHistoricalData(symbol, '5m', 20);
         const prices = recentData.map(candle => candle.close);
-        const rsi = this.calculateRSI(prices);
+        const rsi = calculateRSI(prices);
         
         logger.debug(`Checking breakout conditions: Price=${currentPrice.ask}, RSI=${rsi}`);
         
@@ -232,7 +246,8 @@ export class TORBAnalysisService {
           symbol, 
           range, 
           currentPrice.ask, 
-          rsi
+          rsi,
+          recentData
         );
         
         if (newSignal) {

@@ -8,9 +8,6 @@ export declare class TORBAnalysisService {
     private isTokyoTradingTime;
     private isTORBRangeTime;
     private isTORBBreakoutTime;
-    private calculateRSI;
-    private pipsToPrice;
-    private priceToPips;
     calculateTORBRange(symbol: string, date: string): Promise<TORBRange | null>;
     getTORBRange(symbol: string, date: string): Promise<TORBRange | null>;
     private checkBreakoutConditions;

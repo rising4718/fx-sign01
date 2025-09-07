@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { CandlestickData } from 'lightweight-charts';
-import type { MarketData } from '../types';
+import type { MarketData, CurrencyPair } from '../types';
 import { fxApiService } from '../services/fxApi';
 import { generateTORBMockData, generateNextCandle } from '../utils/mockData';
 
@@ -24,11 +24,11 @@ export const useFxData = (symbol: string = 'USDJPY'): UseFxDataReturn => {
       setError(null);
       
       // 現在価格を取得
-      const price = await fxApiService.getCurrentPrice(symbol);
+      const price = await fxApiService.getCurrentPrice(symbol as CurrencyPair);
       setCurrentPrice(price);
 
       // 履歴データを取得
-      const historical = await fxApiService.getHistoricalData(symbol, '15m', 100);
+      const historical = await fxApiService.getHistoricalData(symbol as CurrencyPair, '15m', 100);
       setChartData(historical);
       
     } catch (err) {

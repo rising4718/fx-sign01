@@ -375,7 +375,7 @@ export const BacktestPanel: React.FC<BacktestPanelProps> = ({
         </div>
       )}
 
-      <style jsx>{`
+      <style>{`
         .backtest-panel {
           background: white;
           border-radius: 8px;

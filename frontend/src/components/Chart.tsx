@@ -84,7 +84,7 @@ const Chart: React.FC<ChartProps> = ({ data, width = 1000, height = 400 }) => {
     // 時間軸ラベル（15分刻みで表示）
     ctx.textAlign = 'center';
     data.forEach((candle, index) => {
-      const date = new Date(candle.time * 1000);
+      const date = new Date(Number(candle.time) * 1000);
       const minutes = date.getMinutes();
       
       // 15分刻み（00, 15, 30, 45）の時だけラベルを表示

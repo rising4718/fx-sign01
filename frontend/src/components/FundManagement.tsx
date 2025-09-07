@@ -237,7 +237,7 @@ const FundManagement: React.FC = () => {
                   max={100000000}
                   step={10000}
                   formatter={value => `¥ ${value}`.replace(/\B(?=(\d{3})+(?!\\d))/g, ',')}
-                  parser={value => value!.replace(/\$\s?|(,*)/g, '')}
+                  parser={value => Number(value!.replace(/\$\s?|(,*)/g, ''))}
                   style={{ width: '100%' }}
                   onChange={(value) => setFundSettings(prev => ({ ...prev, initialCapital: value || 300000 }))}
                 />
@@ -267,7 +267,7 @@ const FundManagement: React.FC = () => {
                   max={1000000}
                   step={1000}
                   formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\\d))/g, ',')}
-                  parser={value => value!.replace(/(,*)/g, '')}
+                  parser={value => Number(value!.replace(/(,*)/g, ''))}
                   style={{ width: '100%' }}
                   onChange={(value) => setFundSettings(prev => ({ ...prev, lotSize: value || 10000 }))}
                 />

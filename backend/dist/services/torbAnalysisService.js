@@ -4,6 +4,7 @@ exports.TORBAnalysisService = void 0;
 const logger_1 = require("../utils/logger");
 const fxDataService_1 = require("./fxDataService");
 const uuid_1 = require("../utils/uuid");
+const technicalIndicators_1 = require("../utils/technicalIndicators");
 class TORBAnalysisService {
     constructor() {
         this.activeSignals = new Map();
@@ -32,31 +33,6 @@ class TORBAnalysisService {
         const minute = jst.getMinutes();
         return (hour === 9 && minute >= 45) || (hour === 10) || (hour === 11 && minute === 0);
     }
-    calculateRSI(prices, period = 14) {
-        if (prices.length < period + 1) {
-            return 50;
-        }
-        const gains = [];
-        const losses = [];
-        for (let i = 1; i < prices.length; i++) {
-            const change = prices[i] - prices[i - 1];
-            gains.push(change > 0 ? change : 0);
-            losses.push(change < 0 ? Math.abs(change) : 0);
-        }
-        const avgGain = gains.slice(-period).reduce((sum, gain) => sum + gain, 0) / period;
-        const avgLoss = losses.slice(-period).reduce((sum, loss) => sum + loss, 0) / period;
-        if (avgLoss === 0)
-            return 100;
-        const rs = avgGain / avgLoss;
-        const rsi = 100 - (100 / (1 + rs));
-        return parseFloat(rsi.toFixed(2));
-    }
-    pipsToPrice(pips) {
-        return pips * 0.001;
-    }
-    priceToPips(priceChange) {
-        return priceChange / 0.001;
-    }
     async calculateTORBRange(symbol, date) {
         const jstDate = new Date(date + 'T09:00:00+09:00');
         const endTime = new Date(jstDate.getTime() + (45 * 60 * 1000));
@@ -69,7 +45,7 @@ class TORBAnalysisService {
             }
             const high = Math.max(...historicalData.map(candle => candle.high));
             const low = Math.min(...historicalData.map(candle => candle.low));
-            const rangePips = this.priceToPips(high - low);
+            const rangePips = (0, technicalIndicators_1.priceToPips)(high - low, symbol);
             const torbRange = {
                 startTime: jstDate,
                 endTime,
@@ -95,37 +71,55 @@ class TORBAnalysisService {
         }
         return await this.calculateTORBRange(symbol, date);
     }
-    async checkBreakoutConditions(symbol, range, currentPrice, rsi) {
-        if (range.range < 15 || range.range > 50) {
-            logger_1.logger.debug(`Range width ${range.range} pips outside valid range (15-50 pips)`);
+    async checkBreakoutConditions(symbol, range, currentPrice, rsi, recentCandles) {
+        if (range.range < 30 || range.range > 55) {
+            logger_1.logger.debug(`Range width ${range.range} pips outside valid range (30-55 pips)`);
             return null;
         }
+        const atr = (0, technicalIndicators_1.calculateATR)(recentCandles, 14);
+        const swingLevels = (0, technicalIndicators_1.findSwingLevels)(recentCandles, 3);
+        const session = (0, technicalIndicators_1.getCurrentSession)();
         let signalType = null;
         let entryPrice = currentPrice;
         let targetPrice = 0;
         let stopLoss = 0;
-        if (currentPrice > range.high && rsi > 55) {
+        const rsiLongOK = rsi >= 45;
+        const rsiShortOK = rsi <= 55;
+        if (currentPrice > range.high && rsiLongOK) {
             signalType = 'LONG';
-            const breakoutPips = this.priceToPips(currentPrice - range.high);
-            targetPrice = currentPrice + (breakoutPips * 1.5 * 0.001);
-            stopLoss = range.low - this.pipsToPrice(5);
-            logger_1.logger.info(`LONG breakout detected: Price=${currentPrice}, Range High=${range.high}, RSI=${rsi}`);
+            let slPrice = swingLevels.swingLow;
+            if (!slPrice || Math.abs(currentPrice - slPrice) > atr * 2) {
+                slPrice = currentPrice - (atr * 1.5);
+            }
+            const minSL = currentPrice - (0, technicalIndicators_1.pipsToPrice)(60, symbol);
+            const maxSL = currentPrice - (0, technicalIndicators_1.pipsToPrice)(15, symbol);
+            stopLoss = Math.max(minSL, Math.min(maxSL, slPrice));
+            const riskAmount = currentPrice - stopLoss;
+            targetPrice = currentPrice + (riskAmount * session.multiplier);
+            logger_1.logger.info(`LONG breakout detected: Price=${currentPrice}, SL=${stopLoss}, TP=${targetPrice}, ATR=${atr}, Session=${session.name}`);
         }
-        else if (currentPrice < range.low && rsi < 45) {
+        else if (currentPrice < range.low && rsiShortOK) {
             signalType = 'SHORT';
-            const breakoutPips = this.priceToPips(range.low - currentPrice);
-            targetPrice = currentPrice - (breakoutPips * 1.5 * 0.001);
-            stopLoss = range.high + this.pipsToPrice(5);
-            logger_1.logger.info(`SHORT breakout detected: Price=${currentPrice}, Range Low=${range.low}, RSI=${rsi}`);
+            let slPrice = swingLevels.swingHigh;
+            if (!slPrice || Math.abs(slPrice - currentPrice) > atr * 2) {
+                slPrice = currentPrice + (atr * 1.5);
+            }
+            const maxSL = currentPrice + (0, technicalIndicators_1.pipsToPrice)(60, symbol);
+            const minSL = currentPrice + (0, technicalIndicators_1.pipsToPrice)(15, symbol);
+            stopLoss = Math.min(maxSL, Math.max(minSL, slPrice));
+            const riskAmount = stopLoss - currentPrice;
+            targetPrice = currentPrice - (riskAmount * session.multiplier);
+            logger_1.logger.info(`SHORT breakout detected: Price=${currentPrice}, SL=${stopLoss}, TP=${targetPrice}, ATR=${atr}, Session=${session.name}`);
         }
         if (!signalType) {
             return null;
         }
-        const rsiStrength = signalType === 'LONG' ? (rsi - 55) / 45 : (45 - rsi) / 45;
-        const breakoutStrength = signalType === 'LONG' ?
-            this.priceToPips(currentPrice - range.high) / 10 :
-            this.priceToPips(range.low - currentPrice) / 10;
-        const confidence = Math.min(0.95, Math.max(0.5, (rsiStrength + breakoutStrength) / 2));
+        const riskRewardRatio = Math.abs(targetPrice - currentPrice) / Math.abs(stopLoss - currentPrice);
+        const atrStrength = atr / (range.range * 0.001);
+        const rsiStrength = signalType === 'LONG' ?
+            Math.min(1, (rsi - 45) / 55) :
+            Math.min(1, (55 - rsi) / 55);
+        const confidence = Math.min(0.95, Math.max(0.5, (riskRewardRatio + atrStrength + rsiStrength) / 3));
         const signal = {
             id: (0, uuid_1.uuidv4)(),
             timestamp: new Date(),
@@ -136,7 +130,10 @@ class TORBAnalysisService {
             range,
             rsi,
             confidence: parseFloat(confidence.toFixed(2)),
-            status: 'ACTIVE'
+            status: 'ACTIVE',
+            atr: parseFloat(atr.toFixed(5)),
+            session: session.name,
+            riskRewardRatio: parseFloat(riskRewardRatio.toFixed(2))
         };
         return signal;
     }
@@ -157,9 +154,9 @@ class TORBAnalysisService {
                 const currentPrice = await this.fxDataService.getCurrentPrice(symbol);
                 const recentData = await this.fxDataService.getHistoricalData(symbol, '5m', 20);
                 const prices = recentData.map(candle => candle.close);
-                const rsi = this.calculateRSI(prices);
+                const rsi = (0, technicalIndicators_1.calculateRSI)(prices);
                 logger_1.logger.debug(`Checking breakout conditions: Price=${currentPrice.ask}, RSI=${rsi}`);
-                const newSignal = await this.checkBreakoutConditions(symbol, range, currentPrice.ask, rsi);
+                const newSignal = await this.checkBreakoutConditions(symbol, range, currentPrice.ask, rsi, recentData);
                 if (newSignal) {
                     this.activeSignals.set(newSignal.id, newSignal);
                     logger_1.logger.info(`New TORB signal generated: ${newSignal.type} at ${newSignal.entryPrice}`);

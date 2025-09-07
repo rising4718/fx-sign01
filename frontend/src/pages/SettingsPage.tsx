@@ -98,7 +98,7 @@ const SettingsPage: React.FC = () => {
                       max={10000000}
                       step={10000}
                       formatter={value => `¥ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                      parser={value => value!.replace(/¥\s?|(,*)/g, '')}
+                      parser={value => Number(value!.replace(/¥\s?|(,*)/g, '')) as any}
                     />
                   </Form.Item>
 
@@ -113,7 +113,7 @@ const SettingsPage: React.FC = () => {
                       max={100000}
                       step={1000}
                       formatter={value => `${value} 通貨`}
-                      parser={value => value!.replace(' 通貨', '')}
+                      parser={value => Number(value!.replace(' 通貨', '')) as any}
                     />
                   </Form.Item>
 
@@ -128,7 +128,7 @@ const SettingsPage: React.FC = () => {
                       max={10}
                       step={0.1}
                       formatter={value => `${value}%`}
-                      parser={value => value!.replace('%', '')}
+                      parser={value => Number(value!.replace('%', '')) as any}
                     />
                   </Form.Item>
                 </Card>
@@ -198,7 +198,7 @@ const SettingsPage: React.FC = () => {
                       max={100000}
                       step={5000}
                       formatter={value => `¥ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                      parser={value => value!.replace(/¥\s?|(,*)/g, '')}
+                      parser={value => Number(value!.replace(/¥\s?|(,*)/g, '')) as any}
                     />
                   </Form.Item>
 
@@ -213,7 +213,7 @@ const SettingsPage: React.FC = () => {
                       max={50000}
                       step={5000}
                       formatter={value => `¥ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                      parser={value => value!.replace(/¥\s?|(,*)/g, '')}
+                      parser={value => Number(value!.replace(/¥\s?|(,*)/g, '')) as any}
                     />
                   </Form.Item>
 

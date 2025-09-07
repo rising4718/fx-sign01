@@ -127,7 +127,7 @@ export const CurrencySelector: React.FC<CurrencySelectorProps> = ({
         ))}
       </div>
 
-      <style jsx>{`
+      <style>{`
         .currency-selector {
           background: #1a1a1a;
           border-radius: 8px;

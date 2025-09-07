@@ -214,7 +214,7 @@ export const PatternAnalysisPanel: React.FC<PatternAnalysisPanelProps> = ({
         </div>
       </div>
 
-      <style jsx>{`
+      <style>{`
         .pattern-panel {
           display: flex;
           flex-direction: column;

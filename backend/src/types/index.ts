@@ -37,6 +37,10 @@ export interface TORBSignal {
   rsi: number;
   confidence: number; // 0-1
   status: 'PENDING' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
+  // Phase 1 improvements
+  atr?: number;
+  session?: 'tokyo' | 'london' | 'ny_early' | 'off';
+  riskRewardRatio?: number;
 }
 
 // API Response Types

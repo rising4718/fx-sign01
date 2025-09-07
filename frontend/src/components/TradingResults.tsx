@@ -22,6 +22,13 @@ import {
   TrophyOutlined
 } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
+import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
+import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
+import weekOfYear from 'dayjs/plugin/weekOfYear';
+
+dayjs.extend(isSameOrAfter);
+dayjs.extend(isSameOrBefore);
+dayjs.extend(weekOfYear);
 
 const { RangePicker } = DatePicker;
 const { Text } = Typography;

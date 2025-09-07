@@ -308,7 +308,6 @@ const LogicManagement: React.FC = () => {
           </Text>
           <Timeline
             style={{ marginTop: '12px' }}
-            size="small"
             items={[
               {
                 children: <Text>東京時間の動きが少ない時間帯の後、欧州時間に入る際の方向性のあるブレイクアウトを狙います</Text>,

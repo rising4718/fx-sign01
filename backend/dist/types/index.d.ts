@@ -32,6 +32,9 @@ export interface TORBSignal {
     rsi: number;
     confidence: number;
     status: 'PENDING' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
+    atr?: number;
+    session?: 'tokyo' | 'london' | 'ny_early' | 'off';
+    riskRewardRatio?: number;
 }
 export interface GMOTickerResponse {
     status: number;
