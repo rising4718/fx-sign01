@@ -42,7 +42,7 @@ export class FxApiService {
   private cache: Map<string, any> = new Map();
   private readonly CACHE_DURATION = 1000; // 1秒キャッシュ（Backend側で1秒更新）
   private websocket: WebSocket | null = null;
-  private wsReconnectTimeout: NodeJS.Timeout | null = null;
+  private wsReconnectTimeout: number | null = null;
 
   private constructor() {}
 
