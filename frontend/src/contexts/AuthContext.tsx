@@ -24,7 +24,7 @@ interface AuthContextType {
 }
 
 // 認証API関数
-const API_BASE_URL = process.env.NODE_ENV === 'production' 
+const API_BASE_URL = (typeof window !== 'undefined' && window.location.hostname === 'fxbuybuy.site') 
   ? 'https://fxbuybuy.site/api' 
   : 'http://localhost:3002/api';
 
