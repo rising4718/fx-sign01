@@ -8,7 +8,8 @@ USD/JPYデイトレード用のサインツールで、東京時間（9:00-11:00
 
 ## 🌐 デモ・アクセス
 
-**🚀 本番環境:** [http://46.250.250.63](http://46.250.250.63)
+**🚀 本番環境:** [https://fxbuybuy.site](https://fxbuybuy.site) (SSL完全対応)  
+**📊 旧IP:** [http://46.250.250.63](http://46.250.250.63) (リダイレクト)
 
 ## 📚 ドキュメント
 
@@ -236,6 +237,14 @@ cd ../frontend && npm install && npm run build
 Private Project - 商用利用禁止
 
 ## 📅 更新履歴
+
+### v2.1.0 (2025-09-07) - SSL・DB対応完了 🔒
+- ✅ **HTTPS対応**: https://fxbuybuy.site でSSL完全対応
+- ✅ **SSL証明書**: Cloudflare Origin Certificate (15年有効)
+- ✅ **データベース**: PostgreSQL本格運用開始
+- ✅ **デモデータ**: 取引統計・履歴データ蓄積開始
+- ✅ **セキュリティ**: Full (strict) モード設定
+- ✅ **商用化準備**: 技術的基盤完成
 
 ### v2.0.0 (2025-09-07) - 本番リリース 🎉
 - ✅ フルスタックアプリケーション完成
