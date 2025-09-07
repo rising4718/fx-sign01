@@ -49,6 +49,15 @@ app.get('/health', (req, res) => {
         environment: process.env.NODE_ENV || 'development'
     });
 });
+app.get('/api/health', (req, res) => {
+    res.status(200).json({
+        status: 'OK',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        environment: process.env.NODE_ENV || 'development',
+        service: 'FX Sign Backend API'
+    });
+});
 app.use('/api/v1/fx', fx_1.fxRoutes);
 app.use('/api/v1/torb', torb_1.torbRoutes);
 app.use('/api/v1/performance', performance_1.performanceRoutes);

@@ -63,6 +63,17 @@ app.get('/health', (req, res) => {
   });
 });
 
+// API Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.status(200).json({
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || 'development',
+    service: 'FX Sign Backend API'
+  });
+});
+
 // API routes
 app.use('/api/v1/fx', fxRoutes);
 app.use('/api/v1/torb', torbRoutes);
