@@ -3,9 +3,10 @@ import express from 'express';
 const router = express.Router();
 
 // 開発環境チェックミドルウェア
-const isDevelopmentOnly = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+const isDevelopmentOnly = (req: express.Request, res: express.Response, next: express.NextFunction): void => {
   if (process.env.NODE_ENV !== 'development') {
-    return res.status(404).json({ error: 'Not found' });
+    res.status(404).json({ error: 'Not found' });
+    return;
   }
   next();
 };
