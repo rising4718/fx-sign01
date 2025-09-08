@@ -11,6 +11,7 @@ import { fxRoutes } from './routes/fx';
 import { torbRoutes } from './routes/torb';
 import { performanceRoutes } from './routes/performance';
 import authRoutes from './routes/auth';
+import devAuthRoutes from './routes/devAuth';
 import { setupWebSocket } from './services/websocketService';
 import { errorHandler } from './middleware/errorHandler';
 import { logger } from './utils/logger';
@@ -81,6 +82,12 @@ app.use('/api/v1/fx', fxRoutes);
 app.use('/api/v1/torb', torbRoutes);
 app.use('/api/v1/performance', performanceRoutes);
 app.use('/api/auth', authRoutes);
+
+// Development-only auth routes
+if (process.env.NODE_ENV === 'development') {
+  app.use('/api/dev/auth', devAuthRoutes);
+  logger.info('🔧 Development auth bypass routes enabled');
+}
 
 // Setup WebSocket service
 setupWebSocket(wss);
