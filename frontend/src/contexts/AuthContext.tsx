@@ -29,7 +29,7 @@ const API_BASE_URL = (typeof window !== 'undefined' && window.location.hostname 
   : 'http://localhost:3002/api';
 
 // 開発環境チェック
-const isDevelopment = process.env.NODE_ENV === 'development';
+const isDevelopment = import.meta.env.MODE === 'development';
 
 // トークン管理
 const getAccessToken = (): string | null => {
