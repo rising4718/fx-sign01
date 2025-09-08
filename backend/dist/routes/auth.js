@@ -35,9 +35,7 @@ const registerValidation = [
         .withMessage('Valid email is required'),
     (0, express_validator_1.body)('password')
         .isLength({ min: 8, max: 100 })
-        .withMessage('Password must be 8-100 characters')
-        .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
-        .withMessage('Password must contain at least one lowercase, uppercase and number'),
+        .withMessage('パスワードは8～100文字で入力してください'),
     (0, express_validator_1.body)('displayName')
         .optional()
         .isLength({ min: 1, max: 100 })
@@ -53,6 +51,7 @@ router.post('/register', registerLimiter, registerValidation, async (req, res) =
         console.log('Registration request received:', req.body);
         const errors = (0, express_validator_1.validationResult)(req);
         if (!errors.isEmpty()) {
+            console.log('Validation errors:', errors.array());
             const errorMessages = errors.array().map(err => err.msg).join(', ');
             res.status(400).json({
                 error: errorMessages,

@@ -15,6 +15,7 @@ const fx_1 = require("./routes/fx");
 const torb_1 = require("./routes/torb");
 const performance_1 = require("./routes/performance");
 const auth_1 = __importDefault(require("./routes/auth"));
+const devAuth_1 = __importDefault(require("./routes/devAuth"));
 const websocketService_1 = require("./services/websocketService");
 const errorHandler_1 = require("./middleware/errorHandler");
 const logger_1 = require("./utils/logger");
@@ -25,7 +26,11 @@ const server = http_1.default.createServer(app);
 const wss = new ws_1.WebSocketServer({ server });
 app.use((0, helmet_1.default)());
 app.use((0, cors_1.default)({
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    origin: [
+        process.env.FRONTEND_URL || 'http://localhost:5173',
+        'http://localhost:5174',
+        'http://localhost:5175'
+    ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
@@ -55,13 +60,19 @@ app.get('/api/health', (req, res) => {
         timestamp: new Date().toISOString(),
         uptime: process.uptime(),
         environment: process.env.NODE_ENV || 'development',
-        service: 'FX Sign Backend API'
+        service: 'FX Sign Backend API',
+        version: '1.0.1',
+        deployment: 'PM2 Unified Deployment System'
     });
 });
 app.use('/api/v1/fx', fx_1.fxRoutes);
 app.use('/api/v1/torb', torb_1.torbRoutes);
 app.use('/api/v1/performance', performance_1.performanceRoutes);
 app.use('/api/auth', auth_1.default);
+if (process.env.NODE_ENV === 'development') {
+    app.use('/api/dev/auth', devAuth_1.default);
+    logger_1.logger.info('🔧 Development auth bypass routes enabled');
+}
 (0, websocketService_1.setupWebSocket)(wss);
 app.use(errorHandler_1.errorHandler);
 app.use('*', (req, res) => {
