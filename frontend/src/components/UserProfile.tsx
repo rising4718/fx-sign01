@@ -71,20 +71,7 @@ const UserProfile: React.FC = () => {
       key: 'settings',
       icon: <SettingOutlined />,
       label: '設定',
-      children: [
-        {
-          key: 'account-settings',
-          icon: <SettingOutlined />,
-          label: 'アカウント設定',
-          onClick: () => navigate('/settings'),
-        },
-        {
-          key: 'torb-settings',
-          icon: <ControlOutlined />,
-          label: 'TORB設定',
-          onClick: () => navigate('/torb-logic'),
-        },
-      ]
+      onClick: () => navigate('/settings'),
     },
     {
       type: 'divider',

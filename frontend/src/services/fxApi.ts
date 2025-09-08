@@ -248,7 +248,7 @@ export class FxApiService {
       clearTimeout(this.wsReconnectTimeout);
     }
     
-    this.wsReconnectTimeout = setTimeout(() => {
+    this.wsReconnectTimeout = window.setTimeout(() => {
       console.log('WebSocket再接続試行中...');
       this.connectRealTimeUpdates(callback);
     }, 5000); // 5秒後に再接続

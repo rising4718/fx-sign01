@@ -39,11 +39,6 @@ const AntHeader: React.FC<AntHeaderProps> = ({
   
   const menuItems = [
     {
-      key: '/',
-      icon: <HomeOutlined />,
-      label: <Link to="/">ホーム</Link>
-    },
-    {
       key: '/trading',
       icon: <BarChartOutlined />,
       label: <Link to="/trading">取引画面</Link>
@@ -81,15 +76,34 @@ const AntHeader: React.FC<AntHeaderProps> = ({
       lineHeight: '36px'
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-        <Title level={5} style={{ color: 'white', margin: 0, fontSize: '13px' }}>
-          FX Pattern Analyzer
-        </Title>
+        <Link 
+          to={isAuthenticated ? "/trading" : "/"} 
+          style={{ 
+            textDecoration: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
+        >
+          <div style={{ 
+            fontSize: '18px', 
+            color: 'white',
+            display: 'flex',
+            alignItems: 'center'
+          }}>
+            📈
+          </div>
+          <Title level={5} style={{ color: 'white', margin: 0, fontSize: '13px' }}>
+            FX Pattern Analyzer
+          </Title>
+        </Link>
         
         <Menu 
           theme="dark"
           mode="horizontal"
           selectedKeys={[location.pathname]}
           items={menuItems}
+          overflowedIndicator={null}
           style={{
             background: 'transparent',
             border: 'none',
