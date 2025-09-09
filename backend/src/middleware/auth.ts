@@ -13,7 +13,7 @@ export interface AuthRequest extends Request {
   user?: {
     id: number;
     email: string;
-    planType: 'free' | 'premium' | 'pro';
+    planType: 'free' | 'basic' | 'pro';
     displayName?: string;
   };
   headers: any;
@@ -24,7 +24,7 @@ export interface AuthRequest extends Request {
 interface JWTPayload {
   id: number;
   email: string;
-  planType: 'free' | 'premium' | 'pro';
+  planType: 'free' | 'basic' | 'pro';
   displayName?: string;
   iat: number;
   exp: number;
@@ -87,7 +87,7 @@ export const authenticateToken = (req: AuthRequest, res: Response, next: NextFun
  * プラン別アクセス制御ミドルウェア
  * 指定されたプラン以上のユーザーのみアクセス許可
  */
-export const requirePlan = (requiredPlan: 'free' | 'premium' | 'pro') => {
+export const requirePlan = (requiredPlan: 'free' | 'basic' | 'pro') => {
   return (req: AuthRequest, res: Response, next: NextFunction): void => {
     if (!req.user) {
       res.status(401).json({ 
@@ -97,7 +97,7 @@ export const requirePlan = (requiredPlan: 'free' | 'premium' | 'pro') => {
       return;
     }
 
-    const planHierarchy = { 'free': 0, 'premium': 1, 'pro': 2 };
+    const planHierarchy = { 'free': 0, 'basic': 1, 'pro': 2 };
     const userLevel = planHierarchy[req.user.planType];
     const requiredLevel = planHierarchy[requiredPlan];
 

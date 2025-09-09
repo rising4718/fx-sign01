@@ -9,7 +9,8 @@ import jwt, { SignOptions } from 'jsonwebtoken';
 import crypto from 'crypto';
 import { JWT_CONFIG, PASSWORD_CONFIG } from '../config/jwt';
 import { prisma } from '../lib/prisma';
-import { PlanType } from '@prisma/client';
+// プラン型定義（Prismaスキーマと一致）
+export type PlanType = 'free' | 'basic' | 'pro';
 
 // ユーザー型定義
 export interface User {
