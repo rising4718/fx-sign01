@@ -6,6 +6,8 @@ export interface AuthRequest extends Request {
         planType: 'free' | 'premium' | 'pro';
         displayName?: string;
     };
+    headers: any;
+    body: any;
 }
 export declare const authenticateToken: (req: AuthRequest, res: Response, next: NextFunction) => void;
 export declare const requirePlan: (requiredPlan: "free" | "premium" | "pro") => (req: AuthRequest, res: Response, next: NextFunction) => void;

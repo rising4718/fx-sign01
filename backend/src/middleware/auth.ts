@@ -16,6 +16,8 @@ export interface AuthRequest extends Request {
     planType: 'free' | 'premium' | 'pro';
     displayName?: string;
   };
+  headers: any;
+  body: any;
 }
 
 // JWT トークンの型定義
