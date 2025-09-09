@@ -105,9 +105,14 @@ jobs:
           npm ci
           cd ..
           
+          # Generate Prisma client and run migrations
+          echo "🗄️ Setting up database..."
+          cd backend
+          npx prisma generate
+          npx prisma migrate deploy
+          
           # Build backend
           echo "🔨 Building backend..."
-          cd backend
           npm run build
           cd ..
           
