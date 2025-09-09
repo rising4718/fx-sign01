@@ -111,7 +111,7 @@ jobs:
           export DATABASE_URL="postgresql://fxuser:fxpass123@localhost:5432/fx_sign_db"
           npx prisma generate
           # 既存データベースの場合はbaselineしてからマイグレーション
-          npx prisma migrate resolve --applied 20240908000000_init || true
+          npx prisma migrate resolve --applied 20250909092145_initial_schema || true
           npx prisma migrate deploy
           
           # Build backend
