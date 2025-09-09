@@ -7,44 +7,19 @@
 import bcrypt from 'bcrypt';
 import jwt, { SignOptions } from 'jsonwebtoken';
 import crypto from 'crypto';
-import { Pool } from 'pg';
 import { JWT_CONFIG, PASSWORD_CONFIG } from '../config/jwt';
-
-// データベース接続プール（遅延初期化）
-let db: Pool | null = null;
-
-const getDb = (): Pool => {
-  if (!db) {
-    console.log('Initializing DB connection with config:', {
-      host: process.env.DB_HOST || 'localhost',
-      port: parseInt(process.env.DB_PORT || '5432'),
-      database: process.env.DB_NAME || 'fx_sign_db',
-      user: process.env.DB_USER || 'fxuser',
-    });
-
-    db = new Pool({
-      host: process.env.DB_HOST || 'localhost',
-      port: parseInt(process.env.DB_PORT || '5432'),
-      database: process.env.DB_NAME || 'fx_sign_db',
-      user: process.env.DB_USER || 'fxuser',
-      password: process.env.DB_PASSWORD || 'fxpass123',
-      max: 20,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 2000,
-    });
-  }
-  return db!; // Non-null assertion since we just created it
-};
+import { prisma } from '../lib/prisma';
+import { PlanType } from '../generated/prisma';
 
 // ユーザー型定義
 export interface User {
   id: number;
   email: string;
-  displayName?: string;
-  planType: 'free' | 'premium' | 'pro';
+  displayName: string;
+  planType: PlanType;
   isEmailVerified: boolean;
   createdAt: Date;
-  lastLogin?: Date;
+  lastLogin: Date | null;
 }
 
 export interface CreateUserData {
@@ -67,8 +42,6 @@ export interface AuthResult {
   user: User;
   tokens: TokenPair;
 }
-
-// データベース接続設定は上記のconstで自動設定済み
 
 /**
  * パスワードハッシュ化
@@ -116,14 +89,13 @@ export const generateTokens = async (user: User): Promise<TokenPair> => {
   const refreshToken = generateRefreshToken();
 
   // リフレッシュトークンをデータベースに保存
-  await getDb().query(`
-    INSERT INTO user_sessions (user_id, refresh_token, expires_at)
-    VALUES ($1, $2, $3)
-  `, [
-    user.id,
-    refreshToken,
-    new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7日後
-  ]);
+  await prisma.user_sessions.create({
+    data: {
+      user_id: user.id,
+      refresh_token: refreshToken,
+      expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7日後
+    }
+  });
 
   return {
     accessToken,
@@ -138,12 +110,11 @@ export const registerUser = async (userData: CreateUserData): Promise<AuthResult
   const { email, password, displayName } = userData;
 
   // メール重複チェック
-  const existingUser = await getDb().query(
-    'SELECT id FROM users WHERE email = $1',
-    [email]
-  );
+  const existingUser = await prisma.users.findUnique({
+    where: { email }
+  });
 
-  if (existingUser.rows.length > 0) {
+  if (existingUser) {
     throw new Error('Email already exists');
   }
 
@@ -159,20 +130,23 @@ export const registerUser = async (userData: CreateUserData): Promise<AuthResult
   const emailVerificationToken = crypto.randomBytes(32).toString('hex');
 
   // ユーザー作成
-  const result = await getDb().query(`
-    INSERT INTO users (email, password_hash, display_name, email_verification_token)
-    VALUES ($1, $2, $3, $4)
-    RETURNING id, email, display_name, plan_type, is_email_verified, created_at
-  `, [email, passwordHash, displayName, emailVerificationToken]);
+  const user = await prisma.users.create({
+    data: {
+      email,
+      password_hash: passwordHash,
+      display_name: displayName || email.split('@')[0], // displayNameがない場合はemailから生成
+      email_verification_token: emailVerificationToken
+    }
+  });
 
-  const user = result.rows[0];
-  const userObj = {
+  const userObj: User = {
     id: user.id,
     email: user.email,
     displayName: user.display_name,
     planType: user.plan_type,
     isEmailVerified: user.is_email_verified,
-    createdAt: user.created_at
+    createdAt: user.created_at,
+    lastLogin: user.last_login
   };
 
   // トークン生成
@@ -191,54 +165,51 @@ export const loginUser = async (loginData: LoginData): Promise<AuthResult> => {
   const { email, password } = loginData;
 
   // ユーザー取得
-  const result = await getDb().query(`
-    SELECT id, email, password_hash, display_name, plan_type, is_email_verified, created_at
-    FROM users WHERE email = $1
-  `, [email]);
+  const user = await prisma.users.findUnique({
+    where: { email }
+  });
 
-  if (result.rows.length === 0) {
+  if (!user) {
     throw new Error('Invalid email or password');
   }
 
-  const userRow = result.rows[0];
-
   // パスワード検証
-  const isValidPassword = await verifyPassword(password, userRow.password_hash);
+  const isValidPassword = await verifyPassword(password, user.password_hash);
   if (!isValidPassword) {
     throw new Error('Invalid email or password');
   }
 
-  const user: User = {
-    id: userRow.id,
-    email: userRow.email,
-    displayName: userRow.display_name,
-    planType: userRow.plan_type,
-    isEmailVerified: userRow.is_email_verified,
-    createdAt: userRow.created_at
+  const userObj: User = {
+    id: user.id,
+    email: user.email,
+    displayName: user.display_name,
+    planType: user.plan_type,
+    isEmailVerified: user.is_email_verified,
+    createdAt: user.created_at,
+    lastLogin: user.last_login
   };
 
   // トークン生成
-  const accessToken = generateAccessToken(user);
+  const accessToken = generateAccessToken(userObj);
   const refreshToken = generateRefreshToken();
 
   // リフレッシュトークンをデータベースに保存
-  await getDb().query(`
-    INSERT INTO user_sessions (user_id, refresh_token, expires_at)
-    VALUES ($1, $2, $3)
-  `, [
-    user.id,
-    refreshToken,
-    new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7日後
-  ]);
+  await prisma.user_sessions.create({
+    data: {
+      user_id: user.id,
+      refresh_token: refreshToken,
+      expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7日後
+    }
+  });
 
   // 最終ログイン更新
-  await getDb().query(
-    'UPDATE users SET last_login = NOW() WHERE id = $1',
-    [user.id]
-  );
+  await prisma.users.update({
+    where: { id: user.id },
+    data: { last_login: new Date() }
+  });
 
   return {
-    user,
+    user: userObj,
     tokens: { accessToken, refreshToken }
   };
 };
@@ -248,25 +219,30 @@ export const loginUser = async (loginData: LoginData): Promise<AuthResult> => {
  */
 export const refreshAccessToken = async (refreshToken: string): Promise<TokenPair> => {
   // リフレッシュトークン検証
-  const result = await getDb().query(`
-    SELECT us.user_id, u.email, u.display_name, u.plan_type, u.is_email_verified, u.created_at
-    FROM user_sessions us
-    JOIN users u ON us.user_id = u.id
-    WHERE us.refresh_token = $1 AND us.expires_at > NOW()
-  `, [refreshToken]);
+  const session = await prisma.user_sessions.findFirst({
+    where: {
+      refresh_token: refreshToken,
+      expires_at: {
+        gt: new Date()
+      }
+    },
+    include: {
+      users: true
+    }
+  });
 
-  if (result.rows.length === 0) {
+  if (!session || !session.users) {
     throw new Error('Invalid or expired refresh token');
   }
 
-  const userRow = result.rows[0];
   const user: User = {
-    id: userRow.user_id,
-    email: userRow.email,
-    displayName: userRow.display_name,
-    planType: userRow.plan_type,
-    isEmailVerified: userRow.is_email_verified,
-    createdAt: userRow.created_at
+    id: session.users.id,
+    email: session.users.email,
+    displayName: session.users.display_name,
+    planType: session.users.plan_type,
+    isEmailVerified: session.users.is_email_verified,
+    createdAt: session.users.created_at,
+    lastLogin: session.users.last_login
   };
 
   // 新しいトークン生成
@@ -274,15 +250,17 @@ export const refreshAccessToken = async (refreshToken: string): Promise<TokenPai
   const newRefreshToken = generateRefreshToken();
 
   // 古いリフレッシュトークンを削除し、新しいものを保存
-  await getDb().query('DELETE FROM user_sessions WHERE refresh_token = $1', [refreshToken]);
-  await getDb().query(`
-    INSERT INTO user_sessions (user_id, refresh_token, expires_at)
-    VALUES ($1, $2, $3)
-  `, [
-    user.id,
-    newRefreshToken,
-    new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-  ]);
+  await prisma.user_sessions.deleteMany({
+    where: { refresh_token: refreshToken }
+  });
+  
+  await prisma.user_sessions.create({
+    data: {
+      user_id: user.id,
+      refresh_token: newRefreshToken,
+      expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+    }
+  });
 
   return {
     accessToken: newAccessToken,
@@ -294,23 +272,23 @@ export const refreshAccessToken = async (refreshToken: string): Promise<TokenPai
  * ログアウト（リフレッシュトークン削除）
  */
 export const logoutUser = async (refreshToken: string): Promise<void> => {
-  await getDb().query('DELETE FROM user_sessions WHERE refresh_token = $1', [refreshToken]);
+  await prisma.user_sessions.deleteMany({
+    where: { refresh_token: refreshToken }
+  });
 };
 
 /**
  * ユーザー情報取得
  */
 export const getUserById = async (userId: number): Promise<User | null> => {
-  const result = await getDb().query(`
-    SELECT id, email, display_name, plan_type, is_email_verified, created_at, last_login
-    FROM users WHERE id = $1
-  `, [userId]);
+  const user = await prisma.users.findUnique({
+    where: { id: userId }
+  });
 
-  if (result.rows.length === 0) {
+  if (!user) {
     return null;
   }
 
-  const user = result.rows[0];
   return {
     id: user.id,
     email: user.email,

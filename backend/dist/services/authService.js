@@ -7,30 +7,8 @@ exports.getUserById = exports.logoutUser = exports.refreshAccessToken = exports.
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const crypto_1 = __importDefault(require("crypto"));
-const pg_1 = require("pg");
 const jwt_1 = require("../config/jwt");
-let db = null;
-const getDb = () => {
-    if (!db) {
-        console.log('Initializing DB connection with config:', {
-            host: process.env.DB_HOST || 'localhost',
-            port: parseInt(process.env.DB_PORT || '5432'),
-            database: process.env.DB_NAME || 'fx_sign_db',
-            user: process.env.DB_USER || 'fxuser',
-        });
-        db = new pg_1.Pool({
-            host: process.env.DB_HOST || 'localhost',
-            port: parseInt(process.env.DB_PORT || '5432'),
-            database: process.env.DB_NAME || 'fx_sign_db',
-            user: process.env.DB_USER || 'fxuser',
-            password: process.env.DB_PASSWORD || 'fxpass123',
-            max: 20,
-            idleTimeoutMillis: 30000,
-            connectionTimeoutMillis: 2000,
-        });
-    }
-    return db;
-};
+const prisma_1 = require("../lib/prisma");
 const hashPassword = async (password) => {
     return bcrypt_1.default.hash(password, jwt_1.PASSWORD_CONFIG.SALT_ROUNDS);
 };
@@ -58,14 +36,13 @@ exports.generateRefreshToken = generateRefreshToken;
 const generateTokens = async (user) => {
     const accessToken = (0, exports.generateAccessToken)(user);
     const refreshToken = (0, exports.generateRefreshToken)();
-    await getDb().query(`
-    INSERT INTO user_sessions (user_id, refresh_token, expires_at)
-    VALUES ($1, $2, $3)
-  `, [
-        user.id,
-        refreshToken,
-        new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-    ]);
+    await prisma_1.prisma.user_sessions.create({
+        data: {
+            user_id: user.id,
+            refresh_token: refreshToken,
+            expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+        }
+    });
     return {
         accessToken,
         refreshToken
@@ -74,8 +51,10 @@ const generateTokens = async (user) => {
 exports.generateTokens = generateTokens;
 const registerUser = async (userData) => {
     const { email, password, displayName } = userData;
-    const existingUser = await getDb().query('SELECT id FROM users WHERE email = $1', [email]);
-    if (existingUser.rows.length > 0) {
+    const existingUser = await prisma_1.prisma.users.findUnique({
+        where: { email }
+    });
+    if (existingUser) {
         throw new Error('Email already exists');
     }
     if (password.length < jwt_1.PASSWORD_CONFIG.MIN_LENGTH) {
@@ -83,19 +62,22 @@ const registerUser = async (userData) => {
     }
     const passwordHash = await (0, exports.hashPassword)(password);
     const emailVerificationToken = crypto_1.default.randomBytes(32).toString('hex');
-    const result = await getDb().query(`
-    INSERT INTO users (email, password_hash, display_name, email_verification_token)
-    VALUES ($1, $2, $3, $4)
-    RETURNING id, email, display_name, plan_type, is_email_verified, created_at
-  `, [email, passwordHash, displayName, emailVerificationToken]);
-    const user = result.rows[0];
+    const user = await prisma_1.prisma.users.create({
+        data: {
+            email,
+            password_hash: passwordHash,
+            display_name: displayName || email.split('@')[0],
+            email_verification_token: emailVerificationToken
+        }
+    });
     const userObj = {
         id: user.id,
         email: user.email,
         displayName: user.display_name,
         planType: user.plan_type,
         isEmailVerified: user.is_email_verified,
-        createdAt: user.created_at
+        createdAt: user.created_at,
+        lastLogin: user.last_login
     };
     const tokens = await (0, exports.generateTokens)(userObj);
     return {
@@ -106,73 +88,80 @@ const registerUser = async (userData) => {
 exports.registerUser = registerUser;
 const loginUser = async (loginData) => {
     const { email, password } = loginData;
-    const result = await getDb().query(`
-    SELECT id, email, password_hash, display_name, plan_type, is_email_verified, created_at
-    FROM users WHERE email = $1
-  `, [email]);
-    if (result.rows.length === 0) {
+    const user = await prisma_1.prisma.users.findUnique({
+        where: { email }
+    });
+    if (!user) {
         throw new Error('Invalid email or password');
     }
-    const userRow = result.rows[0];
-    const isValidPassword = await (0, exports.verifyPassword)(password, userRow.password_hash);
+    const isValidPassword = await (0, exports.verifyPassword)(password, user.password_hash);
     if (!isValidPassword) {
         throw new Error('Invalid email or password');
     }
-    const user = {
-        id: userRow.id,
-        email: userRow.email,
-        displayName: userRow.display_name,
-        planType: userRow.plan_type,
-        isEmailVerified: userRow.is_email_verified,
-        createdAt: userRow.created_at
+    const userObj = {
+        id: user.id,
+        email: user.email,
+        displayName: user.display_name,
+        planType: user.plan_type,
+        isEmailVerified: user.is_email_verified,
+        createdAt: user.created_at,
+        lastLogin: user.last_login
     };
-    const accessToken = (0, exports.generateAccessToken)(user);
+    const accessToken = (0, exports.generateAccessToken)(userObj);
     const refreshToken = (0, exports.generateRefreshToken)();
-    await getDb().query(`
-    INSERT INTO user_sessions (user_id, refresh_token, expires_at)
-    VALUES ($1, $2, $3)
-  `, [
-        user.id,
-        refreshToken,
-        new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-    ]);
-    await getDb().query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id]);
+    await prisma_1.prisma.user_sessions.create({
+        data: {
+            user_id: user.id,
+            refresh_token: refreshToken,
+            expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+        }
+    });
+    await prisma_1.prisma.users.update({
+        where: { id: user.id },
+        data: { last_login: new Date() }
+    });
     return {
-        user,
+        user: userObj,
         tokens: { accessToken, refreshToken }
     };
 };
 exports.loginUser = loginUser;
 const refreshAccessToken = async (refreshToken) => {
-    const result = await getDb().query(`
-    SELECT us.user_id, u.email, u.display_name, u.plan_type, u.is_email_verified, u.created_at
-    FROM user_sessions us
-    JOIN users u ON us.user_id = u.id
-    WHERE us.refresh_token = $1 AND us.expires_at > NOW()
-  `, [refreshToken]);
-    if (result.rows.length === 0) {
+    const session = await prisma_1.prisma.user_sessions.findFirst({
+        where: {
+            refresh_token: refreshToken,
+            expires_at: {
+                gt: new Date()
+            }
+        },
+        include: {
+            users: true
+        }
+    });
+    if (!session || !session.users) {
         throw new Error('Invalid or expired refresh token');
     }
-    const userRow = result.rows[0];
     const user = {
-        id: userRow.user_id,
-        email: userRow.email,
-        displayName: userRow.display_name,
-        planType: userRow.plan_type,
-        isEmailVerified: userRow.is_email_verified,
-        createdAt: userRow.created_at
+        id: session.users.id,
+        email: session.users.email,
+        displayName: session.users.display_name,
+        planType: session.users.plan_type,
+        isEmailVerified: session.users.is_email_verified,
+        createdAt: session.users.created_at,
+        lastLogin: session.users.last_login
     };
     const newAccessToken = (0, exports.generateAccessToken)(user);
     const newRefreshToken = (0, exports.generateRefreshToken)();
-    await getDb().query('DELETE FROM user_sessions WHERE refresh_token = $1', [refreshToken]);
-    await getDb().query(`
-    INSERT INTO user_sessions (user_id, refresh_token, expires_at)
-    VALUES ($1, $2, $3)
-  `, [
-        user.id,
-        newRefreshToken,
-        new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-    ]);
+    await prisma_1.prisma.user_sessions.deleteMany({
+        where: { refresh_token: refreshToken }
+    });
+    await prisma_1.prisma.user_sessions.create({
+        data: {
+            user_id: user.id,
+            refresh_token: newRefreshToken,
+            expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+        }
+    });
     return {
         accessToken: newAccessToken,
         refreshToken: newRefreshToken
@@ -180,18 +169,18 @@ const refreshAccessToken = async (refreshToken) => {
 };
 exports.refreshAccessToken = refreshAccessToken;
 const logoutUser = async (refreshToken) => {
-    await getDb().query('DELETE FROM user_sessions WHERE refresh_token = $1', [refreshToken]);
+    await prisma_1.prisma.user_sessions.deleteMany({
+        where: { refresh_token: refreshToken }
+    });
 };
 exports.logoutUser = logoutUser;
 const getUserById = async (userId) => {
-    const result = await getDb().query(`
-    SELECT id, email, display_name, plan_type, is_email_verified, created_at, last_login
-    FROM users WHERE id = $1
-  `, [userId]);
-    if (result.rows.length === 0) {
+    const user = await prisma_1.prisma.users.findUnique({
+        where: { id: userId }
+    });
+    if (!user) {
         return null;
     }
-    const user = result.rows[0];
     return {
         id: user.id,
         email: user.email,

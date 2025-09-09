@@ -21,24 +21,24 @@ class TORBAnalysisService {
         const minute = jst.getMinutes();
         return hour >= 9 && (hour < 11 || (hour === 11 && minute === 0));
     }
-    isTORBRangeTime(date) {
+    isTokyoBoxTime(date) {
         const jst = this.getJSTTime(date);
         const hour = jst.getHours();
         const minute = jst.getMinutes();
-        return hour === 9 && minute < 45;
+        return hour >= 9 && (hour < 11 || (hour === 11 && minute === 0));
     }
-    isTORBBreakoutTime(date) {
+    isBreakoutMonitoringTime(date) {
         const jst = this.getJSTTime(date);
         const hour = jst.getHours();
         const minute = jst.getMinutes();
-        return (hour === 9 && minute >= 45) || (hour === 10) || (hour === 11 && minute === 0);
+        return hour >= 11;
     }
-    async calculateTORBRange(symbol, date) {
+    async calculateTokyoBoxRange(symbol, date) {
         const jstDate = new Date(date + 'T09:00:00+09:00');
-        const endTime = new Date(jstDate.getTime() + (45 * 60 * 1000));
-        logger_1.logger.debug(`Calculating TORB range for ${symbol} on ${date} (9:00-9:45 JST)`);
+        const endTime = new Date(jstDate.getTime() + (120 * 60 * 1000));
+        logger_1.logger.debug(`Calculating Tokyo Box range for ${symbol} on ${date} (9:00-11:00 JST)`);
         try {
-            const historicalData = await this.fxDataService.getHistoricalData(symbol, '1m', 45);
+            const historicalData = await this.fxDataService.getHistoricalData(symbol, '1m', 120);
             if (historicalData.length === 0) {
                 logger_1.logger.warn(`No historical data available for ${symbol} on ${date}`);
                 return null;
@@ -46,7 +46,16 @@ class TORBAnalysisService {
             const high = Math.max(...historicalData.map(candle => candle.high));
             const low = Math.min(...historicalData.map(candle => candle.low));
             const rangePips = (0, technicalIndicators_1.priceToPips)(high - low, symbol);
-            const torbRange = {
+            const atrD1 = await this.calculateATRFilter(symbol, date);
+            if (!this.validateATRFilter(atrD1)) {
+                logger_1.logger.info(`ATR filter failed for ${symbol}: ${atrD1} pips (required: 70-150)`);
+                return null;
+            }
+            if (!this.validateBoxWidth(rangePips, atrD1)) {
+                logger_1.logger.info(`Box width filter failed for ${symbol}: ${rangePips} pips (required: 30-55, max 70)`);
+                return null;
+            }
+            const tokyoBoxRange = {
                 startTime: jstDate,
                 endTime,
                 high,
@@ -54,14 +63,34 @@ class TORBAnalysisService {
                 range: parseFloat(rangePips.toFixed(1))
             };
             const cacheKey = `${symbol}_${date}`;
-            this.torbRanges.set(cacheKey, torbRange);
-            logger_1.logger.info(`TORB range calculated for ${symbol}: High=${high}, Low=${low}, Range=${rangePips} pips`);
-            return torbRange;
+            this.torbRanges.set(cacheKey, tokyoBoxRange);
+            logger_1.logger.info(`Tokyo Box range calculated for ${symbol}: High=${high}, Low=${low}, Range=${rangePips} pips, ATR=${atrD1}`);
+            return tokyoBoxRange;
         }
         catch (error) {
-            logger_1.logger.error(`Error calculating TORB range for ${symbol}:`, error);
+            logger_1.logger.error(`Error calculating Tokyo Box range for ${symbol}:`, error);
             return null;
         }
+    }
+    async calculateATRFilter(symbol, date) {
+        try {
+            const historicalData = await this.fxDataService.getHistoricalData(symbol, '1D', 14);
+            const atr = (0, technicalIndicators_1.calculateATR)(historicalData, 14);
+            return (0, technicalIndicators_1.priceToPips)(atr, symbol);
+        }
+        catch (error) {
+            logger_1.logger.warn(`ATR calculation failed for ${symbol}:`, error);
+            return 100;
+        }
+    }
+    validateATRFilter(atrPips) {
+        return atrPips >= 70 && atrPips <= 150;
+    }
+    validateBoxWidth(boxWidthPips, atrPips) {
+        const minWidth = 30;
+        const normalMaxWidth = 55;
+        const dynamicMaxWidth = atrPips > 120 ? 70 : normalMaxWidth;
+        return boxWidthPips >= minWidth && boxWidthPips <= dynamicMaxWidth;
     }
     async getTORBRange(symbol, date) {
         const cacheKey = `${symbol}_${date}`;
@@ -69,7 +98,7 @@ class TORBAnalysisService {
         if (cached) {
             return cached;
         }
-        return await this.calculateTORBRange(symbol, date);
+        return await this.calculateTokyoBoxRange(symbol, date);
     }
     async checkBreakoutConditions(symbol, range, currentPrice, rsi, recentCandles) {
         if (range.range < 30 || range.range > 55) {
@@ -85,7 +114,8 @@ class TORBAnalysisService {
         let stopLoss = 0;
         const rsiLongOK = rsi >= 45;
         const rsiShortOK = rsi <= 55;
-        if (currentPrice > range.high && rsiLongOK) {
+        const breakBuffer = (0, technicalIndicators_1.pipsToPrice)(1.5, symbol);
+        if (currentPrice > (range.high + breakBuffer) && rsiLongOK) {
             signalType = 'LONG';
             let slPrice = swingLevels.swingLow;
             if (!slPrice || Math.abs(currentPrice - slPrice) > atr * 2) {
@@ -98,7 +128,7 @@ class TORBAnalysisService {
             targetPrice = currentPrice + (riskAmount * session.multiplier);
             logger_1.logger.info(`LONG breakout detected: Price=${currentPrice}, SL=${stopLoss}, TP=${targetPrice}, ATR=${atr}, Session=${session.name}`);
         }
-        else if (currentPrice < range.low && rsiShortOK) {
+        else if (currentPrice < (range.low - breakBuffer) && rsiShortOK) {
             signalType = 'SHORT';
             let slPrice = swingLevels.swingHigh;
             if (!slPrice || Math.abs(slPrice - currentPrice) > atr * 2) {
@@ -137,6 +167,55 @@ class TORBAnalysisService {
         };
         return signal;
     }
+    async checkRetestEntry(symbol, breakoutSignal, current5mCandles) {
+        if (!breakoutSignal || current5mCandles.length < 3) {
+            return null;
+        }
+        const range = breakoutSignal.range;
+        const recentCandles = current5mCandles.slice(-3);
+        const currentCandle = recentCandles[recentCandles.length - 1];
+        const breakoutTime = breakoutSignal.timestamp.getTime();
+        const currentTime = new Date().getTime();
+        const timeElapsed = (currentTime - breakoutTime) / (1000 * 60);
+        if (timeElapsed > 30) {
+            logger_1.logger.info(`Retest timeout exceeded: ${timeElapsed} minutes > 30 minutes`);
+            return null;
+        }
+        let retestConfirmed = false;
+        let entryPrice = currentCandle.close;
+        if (breakoutSignal.type === 'LONG') {
+            const retestLevel = range.high;
+            const retestBuffer = (0, technicalIndicators_1.pipsToPrice)(3, symbol);
+            const hasRetested = recentCandles.some(candle => Math.abs(candle.low - retestLevel) <= retestBuffer);
+            const hasBounced = currentCandle.close > retestLevel + (0, technicalIndicators_1.pipsToPrice)(1, symbol);
+            retestConfirmed = hasRetested && hasBounced;
+            if (retestConfirmed) {
+                logger_1.logger.info(`LONG retest confirmed: Pullback to ${retestLevel}, bounce to ${currentCandle.close}`);
+            }
+        }
+        else if (breakoutSignal.type === 'SHORT') {
+            const retestLevel = range.low;
+            const retestBuffer = (0, technicalIndicators_1.pipsToPrice)(3, symbol);
+            const hasRetested = recentCandles.some(candle => Math.abs(candle.high - retestLevel) <= retestBuffer);
+            const hasRejected = currentCandle.close < retestLevel - (0, technicalIndicators_1.pipsToPrice)(1, symbol);
+            retestConfirmed = hasRetested && hasRejected;
+            if (retestConfirmed) {
+                logger_1.logger.info(`SHORT retest confirmed: Pullback to ${retestLevel}, rejection to ${currentCandle.close}`);
+            }
+        }
+        if (!retestConfirmed) {
+            return null;
+        }
+        const retestSignal = {
+            ...breakoutSignal,
+            id: (0, uuid_1.uuidv4)(),
+            timestamp: new Date(),
+            entryPrice: parseFloat(entryPrice.toFixed(5)),
+            confidence: Math.min(95, breakoutSignal.confidence + 15),
+        };
+        logger_1.logger.info(`Retest entry signal generated: ${retestSignal.type} at ${entryPrice}, confidence: ${retestSignal.confidence}%`);
+        return retestSignal;
+    }
     async getCurrentSignals(symbol) {
         const now = new Date();
         if (!this.isTokyoTradingTime(now)) {
@@ -149,7 +228,7 @@ class TORBAnalysisService {
             logger_1.logger.debug('No TORB range available for signal generation');
             return Array.from(this.activeSignals.values()).filter(s => s.status === 'ACTIVE');
         }
-        if (this.isTORBBreakoutTime(now)) {
+        if (this.isBreakoutMonitoringTime(now)) {
             try {
                 const currentPrice = await this.fxDataService.getCurrentPrice(symbol);
                 const recentData = await this.fxDataService.getHistoricalData(symbol, '5m', 20);
@@ -178,8 +257,8 @@ class TORBAnalysisService {
             tokyoTime: jstNow,
             tradingSession: {
                 isActive: this.isTokyoTradingTime(now),
-                isRangeTime: this.isTORBRangeTime(now),
-                isBreakoutTime: this.isTORBBreakoutTime(now)
+                isRangeTime: this.isTokyoBoxTime(now),
+                isBreakoutTime: this.isBreakoutMonitoringTime(now)
             },
             range: null,
             currentPrice: null,
@@ -210,7 +289,7 @@ class TORBAnalysisService {
     }
     async calculateTORB(symbol, date) {
         logger_1.logger.info(`Manual TORB calculation for ${symbol} on ${date}`);
-        const range = await this.calculateTORBRange(symbol, date);
+        const range = await this.calculateTokyoBoxRange(symbol, date);
         if (!range) {
             throw new Error(`Could not calculate TORB range for ${symbol} on ${date}`);
         }

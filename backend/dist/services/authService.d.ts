@@ -1,11 +1,12 @@
+import { PlanType } from '../generated/prisma';
 export interface User {
     id: number;
     email: string;
-    displayName?: string;
-    planType: 'free' | 'premium' | 'pro';
+    displayName: string;
+    planType: PlanType;
     isEmailVerified: boolean;
     createdAt: Date;
-    lastLogin?: Date;
+    lastLogin: Date | null;
 }
 export interface CreateUserData {
     email: string;

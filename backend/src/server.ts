@@ -10,14 +10,16 @@ import { WebSocketServer } from 'ws';
 import { fxRoutes } from './routes/fx';
 import { torbRoutes } from './routes/torb';
 import { performanceRoutes } from './routes/performance';
+import { autoTradingRoutes } from './routes/autoTrading';
 import authRoutes from './routes/auth';
 import devAuthRoutes from './routes/devAuth';
 import { setupWebSocket } from './services/websocketService';
 import { errorHandler } from './middleware/errorHandler';
 import { logger } from './utils/logger';
 
-// Load environment variables
-dotenv.config();
+// Load environment variables based on NODE_ENV
+const envFile = process.env.NODE_ENV === 'development' ? '.env.development' : '.env';
+dotenv.config({ path: envFile });
 
 
 const app = express();
@@ -85,6 +87,7 @@ app.get('/api/health', (req, res) => {
 app.use('/api/v1/fx', fxRoutes);
 app.use('/api/v1/torb', torbRoutes);
 app.use('/api/v1/performance', performanceRoutes);
+app.use('/api/v1/auto-trading', autoTradingRoutes);
 app.use('/api/auth', authRoutes);
 
 // Development-only auth routes

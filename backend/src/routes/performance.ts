@@ -135,6 +135,68 @@ router.get('/daily', async (req: Request, res: Response): Promise<void> => {
     const endDate = req.query.endDate as string || 
                    new Date().toISOString().split('T')[0];
 
+    // 開発環境でデータベース接続エラーが発生した場合、モックデータを返す
+    if (process.env.NODE_ENV === 'development') {
+      try {
+        const dailyPerformance = await performanceService.getDailyPerformance(startDate, endDate);
+        
+        res.json({
+          success: true,
+          data: dailyPerformance,
+          period: { startDate, endDate }
+        });
+        return;
+      } catch (dbError) {
+        logger.warn('Database unavailable for daily data, returning mock data:', dbError);
+        
+        // 開発用モック日次データ
+        const mockDailyData = [
+          {
+            date: '2025-09-07',
+            totalTrades: 3,
+            winningTrades: 2,
+            losingTrades: 1,
+            winRate: 66.7,
+            grossProfit: 500,
+            grossLoss: -250,
+            netProfit: 250,
+            profitFactor: 2.0
+          },
+          {
+            date: '2025-09-08',
+            totalTrades: 2,
+            winningTrades: 2,
+            losingTrades: 0,
+            winRate: 100.0,
+            grossProfit: 400,
+            grossLoss: 0,
+            netProfit: 400,
+            profitFactor: null
+          },
+          {
+            date: '2025-09-09',
+            totalTrades: 4,
+            winningTrades: 3,
+            losingTrades: 1,
+            winRate: 75.0,
+            grossProfit: 750,
+            grossLoss: -150,
+            netProfit: 600,
+            profitFactor: 5.0
+          }
+        ];
+
+        res.json({
+          success: true,
+          data: mockDailyData,
+          period: { startDate, endDate },
+          isDevelopmentMock: true
+        });
+        return;
+      }
+    }
+
+    // 本番環境では通常処理
     const dailyPerformance = await performanceService.getDailyPerformance(startDate, endDate);
 
     res.json({
@@ -158,6 +220,65 @@ router.get('/daily', async (req: Request, res: Response): Promise<void> => {
  */
 router.get('/summary', async (req: Request, res: Response): Promise<void> => {
   try {
+    // 開発環境でデータベース接続エラーが発生した場合、モックデータを返す
+    if (process.env.NODE_ENV === 'development') {
+      try {
+        const phaseSummary = await performanceService.getCurrentPhaseSummary();
+        const days = parseInt(req.query.days as string) || 30;
+        const detailedStats = await performanceService.getPerformanceStats(days);
+
+        res.json({
+          success: true,
+          data: {
+            phase: phaseSummary,
+            detailed: detailedStats,
+            analysisPeriod: `${days} days`
+          }
+        });
+        return;
+      } catch (dbError) {
+        logger.warn('Database unavailable, returning mock data:', dbError);
+        
+        // 開発用モックデータ
+        const mockData = {
+          phase: {
+            currentPhase: 'Phase 1',
+            totalTrades: 45,
+            winningTrades: 32,
+            losingTrades: 13,
+            avgWinRate: 71.1,
+            totalPnlPips: 420,
+            avgPnlPerTrade: 9.3,
+            maxDrawdown: 15.2,
+            monthlyReturn: 8.5,
+            daysAboveTarget: 18,
+            totalDaysActive: 25
+          },
+          detailed: {
+            totalTrades: 45,
+            winRate: 71.1,
+            avgDailyReturn: 2.1,
+            maxDrawdown: 15.2,
+            sharpeRatio: 1.4,
+            profitFactor: 1.8,
+            bestDay: 12.5,
+            worstDay: -8.3,
+            consecutiveWinStreak: 7,
+            consecutiveLossStreak: 3
+          },
+          analysisPeriod: `${parseInt(req.query.days as string) || 30} days`
+        };
+
+        res.json({
+          success: true,
+          data: mockData,
+          isDevelopmentMock: true
+        });
+        return;
+      }
+    }
+
+    // 本番環境では通常処理
     const phaseSummary = await performanceService.getCurrentPhaseSummary();
     const days = parseInt(req.query.days as string) || 30;
     const detailedStats = await performanceService.getPerformanceStats(days);

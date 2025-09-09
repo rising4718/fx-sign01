@@ -35,49 +35,61 @@ export class TORBAnalysisService {
     return hour >= 9 && (hour < 11 || (hour === 11 && minute === 0));
   }
 
-  private isTORBRangeTime(date: Date): boolean {
+  private isTokyoBoxTime(date: Date): boolean {
     const jst = this.getJSTTime(date);
     const hour = jst.getHours();
     const minute = jst.getMinutes();
     
-    // TORB range setting time: 9:00-9:45 JST
-    return hour === 9 && minute < 45;
+    // Tokyo Box formation time: 9:00-11:00 JST (2 hours)
+    return hour >= 9 && (hour < 11 || (hour === 11 && minute === 0));
   }
 
-  private isTORBBreakoutTime(date: Date): boolean {
+  private isBreakoutMonitoringTime(date: Date): boolean {
     const jst = this.getJSTTime(date);
     const hour = jst.getHours();
     const minute = jst.getMinutes();
     
-    // TORB breakout monitoring time: 9:45-11:00 JST
-    return (hour === 9 && minute >= 45) || (hour === 10) || (hour === 11 && minute === 0);
+    // Breakout monitoring: After 11:00 JST (box completion)
+    return hour >= 11;
   }
 
   // RSI calculation moved to technicalIndicators.ts
 
   // Pips conversion moved to technicalIndicators.ts
 
-  public async calculateTORBRange(symbol: string, date: string): Promise<TORBRange | null> {
+  public async calculateTokyoBoxRange(symbol: string, date: string): Promise<TORBRange | null> {
     const jstDate = new Date(date + 'T09:00:00+09:00');
-    const endTime = new Date(jstDate.getTime() + (45 * 60 * 1000)); // 9:45 JST
+    const endTime = new Date(jstDate.getTime() + (120 * 60 * 1000)); // 11:00 JST (2 hours)
     
-    logger.debug(`Calculating TORB range for ${symbol} on ${date} (9:00-9:45 JST)`);
+    logger.debug(`Calculating Tokyo Box range for ${symbol} on ${date} (9:00-11:00 JST)`);
 
     try {
-      // Get historical data for the range period (would use actual data in production)
-      const historicalData = await this.fxDataService.getHistoricalData(symbol, '1m', 45);
+      // Get historical data for the 2-hour box period
+      const historicalData = await this.fxDataService.getHistoricalData(symbol, '1m', 120);
       
       if (historicalData.length === 0) {
         logger.warn(`No historical data available for ${symbol} on ${date}`);
         return null;
       }
 
-      // Calculate high and low during range period
+      // Calculate high and low during 2-hour Tokyo box period
       const high = Math.max(...historicalData.map(candle => candle.high));
       const low = Math.min(...historicalData.map(candle => candle.low));
       const rangePips = priceToPips(high - low, symbol);
 
-      const torbRange: TORBRange = {
+      // Apply ATR and box width filters from Tokyo Box Strategy spec
+      const atrD1 = await this.calculateATRFilter(symbol, date);
+      if (!this.validateATRFilter(atrD1)) {
+        logger.info(`ATR filter failed for ${symbol}: ${atrD1} pips (required: 70-150)`);
+        return null;
+      }
+
+      if (!this.validateBoxWidth(rangePips, atrD1)) {
+        logger.info(`Box width filter failed for ${symbol}: ${rangePips} pips (required: 30-55, max 70)`);
+        return null;
+      }
+
+      const tokyoBoxRange: TORBRange = {
         startTime: jstDate,
         endTime,
         high,
@@ -87,15 +99,41 @@ export class TORBAnalysisService {
 
       // Cache the range
       const cacheKey = `${symbol}_${date}`;
-      this.torbRanges.set(cacheKey, torbRange);
+      this.torbRanges.set(cacheKey, tokyoBoxRange);
 
-      logger.info(`TORB range calculated for ${symbol}: High=${high}, Low=${low}, Range=${rangePips} pips`);
-      return torbRange;
+      logger.info(`Tokyo Box range calculated for ${symbol}: High=${high}, Low=${low}, Range=${rangePips} pips, ATR=${atrD1}`);
+      return tokyoBoxRange;
 
     } catch (error) {
-      logger.error(`Error calculating TORB range for ${symbol}:`, error);
+      logger.error(`Error calculating Tokyo Box range for ${symbol}:`, error);
       return null;
     }
+  }
+
+  private async calculateATRFilter(symbol: string, date: string): Promise<number> {
+    try {
+      // Get 14-day historical data for ATR calculation
+      const historicalData = await this.fxDataService.getHistoricalData(symbol, '1D', 14);
+      const atr = calculateATR(historicalData, 14);
+      return priceToPips(atr, symbol);
+    } catch (error) {
+      logger.warn(`ATR calculation failed for ${symbol}:`, error);
+      return 100; // Default fallback value
+    }
+  }
+
+  private validateATRFilter(atrPips: number): boolean {
+    // ATR filter: 70-150 pips (Daily)
+    return atrPips >= 70 && atrPips <= 150;
+  }
+
+  private validateBoxWidth(boxWidthPips: number, atrPips: number): boolean {
+    // Box width: 30-55 pips, dynamic max 70 if ATR is high
+    const minWidth = 30;
+    const normalMaxWidth = 55;
+    const dynamicMaxWidth = atrPips > 120 ? 70 : normalMaxWidth;
+    
+    return boxWidthPips >= minWidth && boxWidthPips <= dynamicMaxWidth;
   }
 
   public async getTORBRange(symbol: string, date: string): Promise<TORBRange | null> {
@@ -107,10 +145,10 @@ export class TORBAnalysisService {
     }
 
     // Calculate if not cached
-    return await this.calculateTORBRange(symbol, date);
+    return await this.calculateTokyoBoxRange(symbol, date);
   }
 
-  private async checkBreakoutConditions(
+  public async checkBreakoutConditions(
     symbol: string, 
     range: TORBRange, 
     currentPrice: number,
@@ -138,8 +176,9 @@ export class TORBAnalysisService {
     const rsiLongOK = rsi >= 45;  // ニュートラル以上
     const rsiShortOK = rsi <= 55; // ニュートラル以下
 
-    // Check for breakout above range high (LONG signal)
-    if (currentPrice > range.high && rsiLongOK) {
+    // Check for breakout above range high with 1.5 pips buffer (LONG signal)
+    const breakBuffer = pipsToPrice(1.5, symbol);
+    if (currentPrice > (range.high + breakBuffer) && rsiLongOK) {
       signalType = 'LONG';
       
       // Structure-based SL with ATR fallback
@@ -159,8 +198,8 @@ export class TORBAnalysisService {
       
       logger.info(`LONG breakout detected: Price=${currentPrice}, SL=${stopLoss}, TP=${targetPrice}, ATR=${atr}, Session=${session.name}`);
     }
-    // Check for breakout below range low (SHORT signal)
-    else if (currentPrice < range.low && rsiShortOK) {
+    // Check for breakout below range low with 1.5 pips buffer (SHORT signal)
+    else if (currentPrice < (range.low - breakBuffer) && rsiShortOK) {
       signalType = 'SHORT';
       
       // Structure-based SL with ATR fallback
@@ -214,6 +253,91 @@ export class TORBAnalysisService {
     return signal;
   }
 
+  // Tokyo Box Strategy: 5-minute retest detection after 15-minute breakout
+  public async checkRetestEntry(
+    symbol: string,
+    breakoutSignal: TORBSignal,
+    current5mCandles: CandleData[]
+  ): Promise<TORBSignal | null> {
+    
+    if (!breakoutSignal || current5mCandles.length < 3) {
+      return null;
+    }
+
+    const range = breakoutSignal.range;
+    const recentCandles = current5mCandles.slice(-3); // Last 3 x 5-minute candles
+    const currentCandle = recentCandles[recentCandles.length - 1];
+    
+    // 30-minute timeout for retest (6 x 5-minute candles)
+    const breakoutTime = breakoutSignal.timestamp.getTime();
+    const currentTime = new Date().getTime();
+    const timeElapsed = (currentTime - breakoutTime) / (1000 * 60); // minutes
+    
+    if (timeElapsed > 30) {
+      logger.info(`Retest timeout exceeded: ${timeElapsed} minutes > 30 minutes`);
+      return null;
+    }
+
+    let retestConfirmed = false;
+    let entryPrice = currentCandle.close;
+
+    if (breakoutSignal.type === 'LONG') {
+      // Long retest: Look for pullback to box high area and bounce
+      const retestLevel = range.high;
+      const retestBuffer = pipsToPrice(3, symbol); // 3 pips tolerance for retest
+      
+      // Check if price has returned near box high level
+      const hasRetested = recentCandles.some(candle => 
+        Math.abs(candle.low - retestLevel) <= retestBuffer
+      );
+      
+      // Check for bounce (current close above retest level)
+      const hasBounced = currentCandle.close > retestLevel + pipsToPrice(1, symbol);
+      
+      retestConfirmed = hasRetested && hasBounced;
+      
+      if (retestConfirmed) {
+        logger.info(`LONG retest confirmed: Pullback to ${retestLevel}, bounce to ${currentCandle.close}`);
+      }
+      
+    } else if (breakoutSignal.type === 'SHORT') {
+      // Short retest: Look for pullback to box low area and rejection
+      const retestLevel = range.low;
+      const retestBuffer = pipsToPrice(3, symbol); // 3 pips tolerance for retest
+      
+      // Check if price has returned near box low level
+      const hasRetested = recentCandles.some(candle => 
+        Math.abs(candle.high - retestLevel) <= retestBuffer
+      );
+      
+      // Check for rejection (current close below retest level)
+      const hasRejected = currentCandle.close < retestLevel - pipsToPrice(1, symbol);
+      
+      retestConfirmed = hasRetested && hasRejected;
+      
+      if (retestConfirmed) {
+        logger.info(`SHORT retest confirmed: Pullback to ${retestLevel}, rejection to ${currentCandle.close}`);
+      }
+    }
+
+    if (!retestConfirmed) {
+      return null;
+    }
+
+    // Create retest entry signal based on original breakout signal
+    const retestSignal: TORBSignal = {
+      ...breakoutSignal,
+      id: uuidv4(),
+      timestamp: new Date(),
+      entryPrice: parseFloat(entryPrice.toFixed(5)),
+      confidence: Math.min(95, breakoutSignal.confidence + 15), // Boost confidence for retest
+    };
+
+    logger.info(`Retest entry signal generated: ${retestSignal.type} at ${entryPrice}, confidence: ${retestSignal.confidence}%`);
+    
+    return retestSignal;
+  }
+
   public async getCurrentSignals(symbol: string): Promise<TORBSignal[]> {
     const now = new Date();
     
@@ -231,7 +355,7 @@ export class TORBAnalysisService {
     }
 
     // Only check for new signals during breakout time
-    if (this.isTORBBreakoutTime(now)) {
+    if (this.isBreakoutMonitoringTime(now)) {
       try {
         const currentPrice = await this.fxDataService.getCurrentPrice(symbol);
         
@@ -274,8 +398,8 @@ export class TORBAnalysisService {
       tokyoTime: jstNow,
       tradingSession: {
         isActive: this.isTokyoTradingTime(now),
-        isRangeTime: this.isTORBRangeTime(now),
-        isBreakoutTime: this.isTORBBreakoutTime(now)
+        isRangeTime: this.isTokyoBoxTime(now),
+        isBreakoutTime: this.isBreakoutMonitoringTime(now)
       },
       range: null as TORBRange | null,
       currentPrice: null as any,
@@ -315,7 +439,7 @@ export class TORBAnalysisService {
   public async calculateTORB(symbol: string, date: string): Promise<any> {
     logger.info(`Manual TORB calculation for ${symbol} on ${date}`);
     
-    const range = await this.calculateTORBRange(symbol, date);
+    const range = await this.calculateTokyoBoxRange(symbol, date);
     if (!range) {
       throw new Error(`Could not calculate TORB range for ${symbol} on ${date}`);
     }

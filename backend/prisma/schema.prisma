@@ -1,0 +1,155 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enums for type safety
+enum PlanType {
+  free
+  basic
+  pro
+}
+
+enum TradeDirection {
+  LONG
+  SHORT
+}
+
+enum ExitReason {
+  TAKE_PROFIT @map("Take profit")
+  STOP_LOSS   @map("Stop loss")
+  TIME_STOP
+  MANUAL
+}
+
+enum EntryMethod {
+  BOX_BREAKDOWN @map("Box breakdown")
+  BOX_BREAKOUT  @map("Box breakout")
+  RETEST
+  DIRECT_BREAK
+}
+
+enum EntrySession {
+  TOKYO   @map("Tokyo")
+  EUROPE
+  NY_EARLY
+}
+
+enum VolatilityRegime {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model backtest_results {
+  id                   Int       @id @default(autoincrement())
+  test_name            String    @db.VarChar(255)
+  start_date           DateTime  @db.Date
+  end_date             DateTime  @db.Date
+  strategy_version     String    @db.VarChar(100)
+  parameters           Json
+  total_trades         Int
+  winning_trades       Int
+  losing_trades        Int
+  win_rate             Decimal   @db.Decimal(5, 2)
+  net_profit           Decimal   @db.Decimal(15, 2)
+  profit_factor        Decimal?  @db.Decimal(8, 3)
+  max_drawdown         Decimal?  @db.Decimal(15, 2)
+  max_drawdown_percent Decimal?  @db.Decimal(6, 2)
+  sharpe_ratio         Decimal?  @db.Decimal(8, 4)
+  sortino_ratio        Decimal?  @db.Decimal(8, 4)
+  monthly_returns      Json?
+  daily_equity_curve   Json?
+  notes                String?
+  created_at           DateTime? @default(now()) @db.Timestamptz(6)
+
+  @@index([start_date], map: "idx_backtest_results_start_date")
+  @@index([strategy_version], map: "idx_backtest_results_strategy_version")
+  @@index([test_name], map: "idx_backtest_results_test_name")
+}
+
+model market_environment {
+  id                       Int       @id @default(autoincrement())
+  date                     DateTime  @unique @db.Date
+  atr_d1_usdjpy            Decimal?  @db.Decimal(8, 5)
+  atr_d1_eurusd            Decimal?  @db.Decimal(8, 5)
+  daily_range_usdjpy       Decimal?  @db.Decimal(8, 2)
+  daily_range_eurusd       Decimal?  @db.Decimal(8, 2)
+  tokyo_session_range      Decimal?  @db.Decimal(8, 2)
+  europe_session_range     Decimal?  @db.Decimal(8, 2)
+  ny_session_range         Decimal?  @db.Decimal(8, 2)
+  vix_value                Decimal?  @db.Decimal(6, 2)
+  dxy_close                Decimal?  @db.Decimal(8, 3)
+  nikkei_change_percent    Decimal?  @db.Decimal(6, 2)
+  spx_change_percent       Decimal?  @db.Decimal(6, 2)
+  major_news_events        String[]
+  economic_calendar_impact String?   @db.VarChar(20)
+  created_at               DateTime? @default(now()) @db.Timestamptz(6)
+
+  @@index([date], map: "idx_market_environment_date")
+}
+
+model trades {
+  id                Int               @id @default(autoincrement())
+  symbol            String            @db.VarChar(10)
+  entry_time        DateTime          @db.Timestamptz(6)
+  exit_time         DateTime?         @db.Timestamptz(6)
+  direction         TradeDirection
+  box_high          Decimal           @db.Decimal(10, 5)
+  box_low           Decimal           @db.Decimal(10, 5)
+  box_width_pips    Decimal           @db.Decimal(8, 2)
+  entry_session     EntrySession
+  entry_price       Decimal           @db.Decimal(10, 5)
+  entry_method      EntryMethod?
+  exit_price        Decimal?          @db.Decimal(10, 5)
+  exit_reason       ExitReason?
+  position_size     Decimal           @db.Decimal(12, 2)
+  stop_loss         Decimal           @db.Decimal(10, 5)
+  take_profit       Decimal?          @db.Decimal(10, 5)
+  pnl_pips          Decimal?          @db.Decimal(8, 2)
+  pnl_amount        Decimal?          @db.Decimal(12, 2)
+  risk_reward_ratio Decimal?          @db.Decimal(6, 2)
+  atr_d1            Decimal?          @db.Decimal(8, 5)
+  spread_at_entry   Decimal?          @db.Decimal(6, 2)
+  volatility_regime VolatilityRegime?
+  created_at        DateTime?         @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime?         @default(now()) @db.Timestamptz(6)
+
+  @@index([direction], map: "idx_trades_direction")
+  @@index([entry_session], map: "idx_trades_entry_session")
+  @@index([entry_time], map: "idx_trades_entry_time")
+  @@index([exit_time], map: "idx_trades_exit_time")
+  @@index([symbol], map: "idx_trades_symbol")
+}
+
+model user_sessions {
+  id            Int       @id @default(autoincrement())
+  user_id       Int?
+  refresh_token String    @db.VarChar(500)
+  expires_at    DateTime  @db.Timestamptz(6)
+  created_at    DateTime? @default(now()) @db.Timestamptz(6)
+  user_agent    String?
+  ip_address    String?   @db.Inet
+  users         users?    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model users {
+  id                       Int             @id @default(autoincrement())
+  email                    String          @unique @db.VarChar(255)
+  password_hash            String          @db.VarChar(255)
+  display_name             String          @db.VarChar(100)
+  plan_type                PlanType        @default(free)
+  is_email_verified        Boolean         @default(false)
+  email_verification_token String?         @db.VarChar(255)
+  password_reset_token     String?         @db.VarChar(255)
+  password_reset_expires   DateTime?       @db.Timestamptz(6)
+  created_at               DateTime        @default(now()) @db.Timestamptz(6)
+  updated_at               DateTime        @default(now()) @db.Timestamptz(6)
+  last_login               DateTime?       @db.Timestamptz(6)
+  user_sessions            user_sessions[]
+}

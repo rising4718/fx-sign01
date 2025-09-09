@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  # PostgreSQL データベース
+  postgres:
+    image: postgres:15-alpine
+    container_name: fx-sign-postgres
+    environment:
+      POSTGRES_USER: fxuser
+      POSTGRES_PASSWORD: fxpass123
+      POSTGRES_DB: fx_sign_db
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fxuser -d fx_sign_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # pgAdmin (optional - DB管理GUI)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: fx-sign-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@fxsign.local
+      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_LISTEN_PORT: 80
+    ports:
+      - "8080:80"
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    profiles:
+      - tools # 必要時のみ起動: docker-compose --profile tools up
+
+volumes:
+  postgres_data:
+    driver: local
