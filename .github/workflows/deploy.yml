@@ -113,11 +113,22 @@ jobs:
           echo "🗄️ Setting up database..."
           cd backend
           export DATABASE_URL="postgresql://fxuser:fxpass123@localhost:5432/fx_sign_db"
+          
+          # Clean and regenerate Prisma client
+          echo "🔄 Regenerating Prisma client..."
+          rm -rf node_modules/.prisma
+          rm -rf src/generated
           npx prisma generate
+          
           # 既存データベースの場合はbaselineしてからマイグレーション
+          echo "📋 Database migration..."
           npx prisma migrate resolve --applied 20250909092145_initial_schema || true
           npx prisma db push --accept-data-loss || true
           npx prisma migrate deploy || echo "Migration completed with warnings"
+          
+          # Verify Prisma client is working
+          echo "✅ Verifying Prisma client..."
+          node -e "const { PrismaClient } = require('@prisma/client'); new PrismaClient(); console.log('Prisma client OK');"
           
           # Build backend
           echo "🔨 Building backend..."
