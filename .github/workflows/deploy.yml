@@ -57,7 +57,7 @@ jobs:
     - name: Run Backend Tests
       run: |
         cd backend
-        npm test || echo "No tests found"
+        npm test --passWithNoTests || echo "No tests found, continuing..."
     
     - name: Run Frontend Tests
       run: |
