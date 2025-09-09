@@ -92,8 +92,9 @@ jobs:
           # Navigate to project directory
           cd /var/www/fx-sign01
           
-          # Pull latest code
+          # Stash local changes and pull latest code
           echo "📥 Pulling latest code from GitHub..."
+          git stash
           git pull origin main
           
           # Install dependencies if needed

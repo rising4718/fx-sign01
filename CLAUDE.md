@@ -6,6 +6,29 @@
 - `git push origin main` - mainブランチへのプッシュで自動デプロイ実行
 - デプロイ監視: https://github.com/rising4718/fx-sign01/actions
 
+### ⚠️ **必須デプロイルール**: ワークフロー検証・失敗修正の徹底
+**デプロイ後は必ずワークフロー結果を確認し、失敗時は修正を繰り返し成功まで継続すること**
+
+```bash
+# 1. プッシュ後のワークフロー確認
+gh run list --repo rising4718/fx-sign01 --limit 1
+
+# 2. 失敗時の詳細確認
+gh run view [RUN_ID] --repo rising4718/fx-sign01
+
+# 3. 失敗ログの確認
+gh run view [RUN_ID] --log-failed --repo rising4718/fx-sign01
+
+# 4. エラー修正後、再度プッシュ
+git add . && git commit -m "fix: [エラー内容]" && git push origin main
+
+# 5. 成功まで 1-4 を繰り返す
+```
+
+**デプロイ完了基準**: 
+- ✅ GitHub Actions: `completed success`
+- ✅ ヘルスチェック: `curl -f https://fxbuybuy.site/api/health`
+
 ### 手動デプロイ (緊急時のみ)
 - SSH接続: `ssh root@46.250.250.63`
 - デプロイスクリプト: `cd /var/www/fx-sign01 && ./deploy.sh`
