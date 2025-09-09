@@ -105,9 +105,10 @@ jobs:
           npm ci
           cd ..
           
-          # Generate Prisma client and run migrations
+          # Set up environment variables and database
           echo "🗄️ Setting up database..."
           cd backend
+          export DATABASE_URL="postgresql://fxuser:fxpass123@localhost:5432/fx_sign_db"
           npx prisma generate
           npx prisma migrate deploy
           
