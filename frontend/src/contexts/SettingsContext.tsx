@@ -142,7 +142,13 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
       if (savedSettings) {
         const parsed = JSON.parse(savedSettings);
         // マイグレーション：新しい設定項目のデフォルト値をマージ
-        return { ...DEFAULT_SETTINGS, ...parsed };
+        const migratedSettings = { 
+          ...DEFAULT_SETTINGS, 
+          ...parsed,
+          // account設定のマイグレーション（存在しない場合はデフォルト値を使用）
+          account: parsed.account || DEFAULT_SETTINGS.account
+        };
+        return migratedSettings;
       }
     } catch (error) {
       console.error('Failed to load settings from localStorage:', error);

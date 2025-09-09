@@ -14,13 +14,13 @@ const { Text } = Typography;
 const TradingPage: React.FC = () => {
   const { settings, isDemo } = useSettings();
   
-  // 取引シミュレーター初期化
+  // 取引シミュレーター初期化（設定が未定義の場合はデフォルト値を使用）
   const [tradingSimulator] = useState(() => new TradingSimulator({
-    balance: settings.account.balance,
-    leverage: settings.account.leverage,
-    marginRequirement: settings.account.marginRequirement,
-    riskPercent: settings.account.riskPercent,
-    currency: settings.account.currency
+    balance: settings?.account?.balance || 100000,
+    leverage: settings?.account?.leverage || 25,
+    marginRequirement: settings?.account?.marginRequirement || 4.0,
+    riskPercent: settings?.account?.riskPercent || 2.0,
+    currency: settings?.account?.currency || 'JPY'
   }));
   const [currentPrice, setCurrentPrice] = useState<number>(150.123);
   const [chartData, setChartData] = useState<any[]>([]);
