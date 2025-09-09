@@ -4,7 +4,7 @@
  * 用途: データベース接続とクエリの統一管理
  */
 
-import { PrismaClient } from '../generated/prisma';
+import { PrismaClient } from '@prisma/client';
 
 // Prisma Client のシングルトンインスタンス
 let prisma: PrismaClient;
