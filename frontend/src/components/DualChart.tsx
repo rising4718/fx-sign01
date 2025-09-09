@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Card, Space, Typography, Tag } from 'antd';
+import SessionHelpModal from './SessionHelpModal';
 
 const { Text } = Typography;
 
@@ -33,6 +34,7 @@ const DualChart: React.FC<DualChartProps> = ({
   const mainChartRef = useRef<HTMLDivElement>(null);
   const detailChartRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [sessionHelpVisible, setSessionHelpVisible] = useState(false);
 
   // レスポンシブ対応
   useEffect(() => {
@@ -404,12 +406,19 @@ const DualChart: React.FC<DualChartProps> = ({
   }, [detailData, isMobile]);
 
   const getCurrentSession = () => {
-    const jst = new Date(new Date().getTime() + (9 * 60 * 60 * 1000));
+    // 正しいJST時間の計算 (UTC+9)
+    const now = new Date();
+    const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+    const jst = new Date(utc + (9 * 60 * 60 * 1000));
     const hour = jst.getHours();
     
+    // 6つのFX主要セッション（JST基準）
+    if (hour >= 6 && hour < 9) return { name: 'シドニー', color: '#13c2c2' };
     if (hour >= 9 && hour < 15) return { name: '東京', color: '#52c41a' };
-    if (hour >= 16 && hour < 24) return { name: 'ロンドン', color: '#1890ff' };
+    if (hour >= 15 && hour < 16) return { name: '東京後場', color: '#73d13d' };
+    if (hour >= 16 && hour < 22) return { name: 'ロンドン', color: '#1890ff' };
     if (hour >= 22 || hour < 2) return { name: 'NY序盤', color: '#fa8c16' };
+    if (hour >= 2 && hour < 6) return { name: 'NY後半', color: '#ff7875' };
     return { name: 'オフ', color: '#8c8c8c' };
   };
 
@@ -422,8 +431,27 @@ const DualChart: React.FC<DualChartProps> = ({
           <Text style={{ margin: 0, color: '#ffffff', fontSize: '14px', fontWeight: 'bold' }}>
             デュアルチャート表示
           </Text>
-          <Tag color={session.color} style={{ fontSize: '11px', padding: '2px 6px' }}>
-            {session.name}セッション
+          <Tag 
+            color={session.color} 
+            onClick={() => setSessionHelpVisible(true)}
+            style={{ 
+              fontSize: '11px', 
+              padding: '2px 6px',
+              cursor: 'pointer'
+            }}
+            title="クリックしてセッション詳細を表示"
+          >
+            {session.name}セッション <span style={{
+              backgroundColor: 'rgba(255, 255, 255, 0.2)',
+              borderRadius: '50%',
+              width: '14px',
+              height: '14px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '8px',
+              marginLeft: '4px'
+            }}>?</span>
           </Tag>
           {currentPrice && (
             <Text style={{ color: '#ffffff', fontSize: '13px', fontWeight: 'bold' }}>
@@ -488,6 +516,11 @@ const DualChart: React.FC<DualChartProps> = ({
           />
         </Card>
       </div>
+      
+      <SessionHelpModal
+        visible={sessionHelpVisible}
+        onCancel={() => setSessionHelpVisible(false)}
+      />
     </div>
   );
 };

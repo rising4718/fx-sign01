@@ -5,6 +5,7 @@ import DualChart from '../components/DualChart';
 import AntHeader from '../components/AntHeader';
 import { fxApiService } from '../services/fxApi';
 import { useSettings } from '../contexts/SettingsContext';
+import { getCurrentJST } from '../utils/timeUtils';
 
 const { Content } = Layout;
 const { Text } = Typography;
@@ -27,14 +28,60 @@ const TradingPage: React.FC = () => {
   });
   const [lastCandleSwitch, setLastCandleSwitch] = useState<Date | null>(null);
 
+  // TORB状態を計算する関数
+  const getTorbStatus = () => {
+    const now = getCurrentJST();
+    const hour = now.getHours();
+    const isRangeTime = hour >= 9 && hour < 11;
+    const isBreakoutTime = hour >= 11 && hour < 15;
+    
+    if (activeSignal) {
+      return {
+        phase: 'trading' as const,
+        hasActiveSignal: true,
+        currentRange: currentRange || undefined
+      };
+    } else if (isBreakoutTime && currentRange) {
+      return {
+        phase: 'breakout' as const,
+        hasActiveSignal: false,
+        currentRange: currentRange
+      };
+    } else if (isRangeTime) {
+      return {
+        phase: 'range' as const,
+        hasActiveSignal: false,
+        currentRange: currentRange || undefined
+      };
+    } else {
+      return {
+        phase: 'off' as const,
+        hasActiveSignal: false,
+        currentRange: currentRange || undefined
+      };
+    }
+  };
+
   // セッション情報を取得する関数
   const getCurrentSession = () => {
-    const jst = new Date(new Date().getTime() + (9 * 60 * 60 * 1000));
+    // 正しいJST時間の計算 (UTC+9)
+    const now = new Date();
+    const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+    const jst = new Date(utc + (9 * 60 * 60 * 1000));
     const hour = jst.getHours();
     
+    // デバッグログ（開発環境のみ）
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`Session check - UTC: ${now.toISOString()}, JST: ${jst.toISOString()}, Hour: ${hour}`);
+    }
+    
+    // 6つのFX主要セッション（JST基準）
+    if (hour >= 6 && hour < 9) return { name: 'シドニー', color: '#13c2c2' };
     if (hour >= 9 && hour < 15) return { name: '東京', color: '#52c41a' };
-    if (hour >= 16 && hour < 24) return { name: 'ロンドン', color: '#1890ff' };
+    if (hour >= 15 && hour < 16) return { name: '東京後場', color: '#73d13d' };
+    if (hour >= 16 && hour < 22) return { name: 'ロンドン', color: '#1890ff' };
     if (hour >= 22 || hour < 2) return { name: 'NY序盤', color: '#fa8c16' };
+    if (hour >= 2 && hour < 6) return { name: 'NY後半', color: '#ff7875' };
     return { name: 'オフ', color: '#8c8c8c' };
   };
   
@@ -814,6 +861,7 @@ const TradingPage: React.FC = () => {
         currentPrice={currentPrice}
         currencyPair="USD/JPY"
         sessionInfo={getCurrentSession()}
+        torbStatus={getTorbStatus()}
       />
       <Content style={{ padding: '16px' }}>
         <Tabs defaultActiveKey="chart" items={items} />
