@@ -218,6 +218,51 @@ curl https://fxbuybuy.site/api/health
 
 ---
 
-**最終更新**: 2025-09-07  
-**対応バージョン**: v2.0-dev  
+## 🔧 トラブルシューティング
+
+### ポート競合エラー
+```bash
+# 使用中のポートを確認
+lsof -i :3002  # Backend
+lsof -i :5173  # Frontend
+
+# プロセス終了
+kill -9 <PID>
+```
+
+**重要**: 開発サーバー起動前に必ず既存プロセスの確認を行ってください。
+
+### TypeScript エラー
+```bash
+# Backend: "Not all code paths return a value"
+# - void関数では早期returnではなくif-elseを使用
+
+# Frontend: "Cannot find name 'process'"
+# - process.env.NODE_ENV → import.meta.env.MODE を使用
+```
+
+### ESLint 設定
+```bash
+# Backend ESLint設定確認
+ls backend/.eslintrc.js
+
+# Frontend ESLint設定確認
+cat frontend/eslint.config.js
+```
+
+### 開発環境変数
+**Backend**: `NODE_ENV=development` 必須
+```bash
+cd backend && NODE_ENV=development npm run dev
+```
+
+**Frontend**: Vite環境変数使用
+```bash
+cd frontend && npm run dev  # 自動でdevelopmentモード
+```
+
+---
+
+**最終更新**: 2025-09-08  
+**対応バージョン**: v2.4.0  
 **開発環境**: Node.js 22, React 18, TypeScript 5

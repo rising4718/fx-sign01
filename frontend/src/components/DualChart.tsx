@@ -452,7 +452,7 @@ const DualChart: React.FC<DualChartProps> = ({
             border: '1px solid #434343',
             minHeight: 300
           }}
-          bodyStyle={{ padding: 0 }}
+          styles={{ body: { padding: 0 } }}
         >
           <div 
             ref={mainChartRef} 
@@ -474,7 +474,7 @@ const DualChart: React.FC<DualChartProps> = ({
             border: '1px solid #434343',
             minHeight: 300
           }}
-          bodyStyle={{ padding: 0 }}
+          styles={{ body: { padding: 0 } }}
         >
           <div 
             ref={detailChartRef} 

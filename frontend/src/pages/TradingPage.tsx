@@ -508,7 +508,7 @@ const TradingPage: React.FC = () => {
           <Col xs={24} lg={5}>
             <Row gutter={[0, 12]}>
               <Col xs={24}>
-                <Card title="💰 損益" size="small" bodyStyle={{ padding: '12px' }}>
+                <Card title="💰 損益" size="small" styles={{ body: { padding: '12px' } }}>
                   <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
                     <Text style={{ fontSize: '12px', color: '#8c8c8c' }}>残高</Text>
                     <Text style={{ fontSize: '15px', fontWeight: 'bold', color: '#52c41a' }}>
@@ -550,7 +550,7 @@ const TradingPage: React.FC = () => {
                 </Card>
               </Col>
               <Col xs={24}>
-                <Card title="📊 取引" size="small" bodyStyle={{ padding: '12px' }}>
+                <Card title="📊 取引" size="small" styles={{ body: { padding: '12px' } }}>
                   <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
                     <Text style={{ fontSize: '12px', color: '#8c8c8c' }}>取引量</Text>
                     <Text style={{ fontSize: '15px', fontWeight: 'bold', color: '#1890ff' }}>
@@ -576,7 +576,7 @@ const TradingPage: React.FC = () => {
                 </Card>
               </Col>
               <Col xs={24}>
-                <Card title="💼 ポジション" size="small" bodyStyle={{ padding: '12px' }}>
+                <Card title="💼 ポジション" size="small" styles={{ body: { padding: '12px' } }}>
                   {activeSignal ? (
                     <div>
                       <div style={{ marginBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -626,7 +626,7 @@ const TradingPage: React.FC = () => {
                 </Card>
               </Col>
               <Col xs={24}>
-                <Card title="⚙️ システム" size="small" bodyStyle={{ padding: '12px' }}>
+                <Card title="⚙️ システム" size="small" styles={{ body: { padding: '12px' } }}>
                   <div style={{ marginBottom: 6, display: 'flex', justifyContent: 'space-between' }}>
                     <Text style={{ fontSize: '12px', color: '#8c8c8c' }}>モード</Text>
                     <Tag color={isDemo ? 'blue' : 'red'} style={{ fontSize: '11px', margin: 0 }}>
@@ -650,7 +650,7 @@ const TradingPage: React.FC = () => {
           <Col xs={24}>
             <Row gutter={[16, 16]}>
               <Col xs={24} sm={6}>
-                <Card bodyStyle={{ padding: '12px' }}>
+                <Card styles={{ body: { padding: '12px' } }}>
                   <div style={{ textAlign: 'center' }}>
                     <Text type="secondary" style={{ fontSize: '12px' }}>今日のシグナル数</Text>
                     <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#1890ff' }}>
@@ -663,7 +663,7 @@ const TradingPage: React.FC = () => {
                 </Card>
               </Col>
               <Col xs={24} sm={6}>
-                <Card bodyStyle={{ padding: '12px' }}>
+                <Card styles={{ body: { padding: '12px' } }}>
                   <div style={{ textAlign: 'center' }}>
                     <Text type="secondary" style={{ fontSize: '12px' }}>勝利数</Text>
                     <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#52c41a' }}>
@@ -676,7 +676,7 @@ const TradingPage: React.FC = () => {
                 </Card>
               </Col>
               <Col xs={24} sm={6}>
-                <Card bodyStyle={{ padding: '12px' }}>
+                <Card styles={{ body: { padding: '12px' } }}>
                   <div style={{ textAlign: 'center' }}>
                     <Text type="secondary" style={{ fontSize: '12px' }}>敗北数</Text>
                     <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#ff4d4f' }}>
@@ -689,7 +689,7 @@ const TradingPage: React.FC = () => {
                 </Card>
               </Col>
               <Col xs={24} sm={6}>
-                <Card bodyStyle={{ padding: '12px' }}>
+                <Card styles={{ body: { padding: '12px' } }}>
                   <div style={{ textAlign: 'center' }}>
                     <Text type="secondary" style={{ fontSize: '12px' }}>勝率</Text>
                     <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#fa8c16' }}>
@@ -706,7 +706,7 @@ const TradingPage: React.FC = () => {
             </Row>
           </Col>
           <Col xs={24}>
-            <Card title="アクティブシグナル" size="small" bodyStyle={{ padding: '12px' }}>
+            <Card title="アクティブシグナル" size="small" styles={{ body: { padding: '12px' } }}>
               {activeSignal ? (
                 <Space direction="vertical" style={{ width: '100%' }}>
                   <div>

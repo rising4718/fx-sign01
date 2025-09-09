@@ -397,6 +397,61 @@ dpkg-reconfigure -plow unattended-upgrades
 
 ---
 
-**作成日**: 2025-09-06  
+## 🔧 デプロイメントのトラブルシューティング
+
+### GitHub Actions 失敗時の対処
+
+**ESLintエラー**:
+```bash
+# Backend ESLint設定確認
+ls backend/.eslintrc.js
+
+# Frontend ESLint警告への変更確認
+grep -A5 "rules:" frontend/eslint.config.js
+```
+
+**TypeScript エラー**:
+```bash
+# Backend ビルド確認
+cd backend && npm run build
+
+# Frontend ビルド確認  
+cd frontend && npm run build
+```
+
+**ブランチ不一致**:
+```bash
+# 本番サーバーのブランチ確認
+ssh root@46.250.250.63 'cd /var/www/fx-sign01 && git branch'
+
+# mainブランチに切り替え（必要に応じて）
+ssh root@46.250.250.63 'cd /var/www/fx-sign01 && git stash && git checkout main'
+```
+
+### PM2 プロセス管理
+```bash
+# プロセス状態確認
+ssh root@46.250.250.63 'pm2 list'
+
+# プロセス再起動
+ssh root@46.250.250.63 'pm2 reload fx-sign-backend'
+
+# ログ確認
+ssh root@46.250.250.63 'pm2 logs fx-sign-backend --lines 20'
+```
+
+### 重要な設定確認項目
+
+**環境変数**:
+- 本番サーバー: `NODE_ENV=production` 確認必須
+- 開発用認証バイパス: 本番環境で完全無効であることの確認
+
+**ポート設定**:
+- Backend: 本番で3002ポート使用確認
+- Frontend: Nginxでの静的ファイル配信確認
+
+---
+
+**最終更新**: 2025-09-08  
 **対象サーバー**: 46.250.250.63  
-**アプリケーション**: FX Sign Tool v1.0
+**アプリケーション**: FX Pattern Analyzer v2.4.0

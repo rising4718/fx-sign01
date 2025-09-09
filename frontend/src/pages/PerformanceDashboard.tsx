@@ -27,6 +27,7 @@ import {
   CheckCircleOutlined
 } from '@ant-design/icons';
 import AntHeader from '../components/AntHeader';
+import { fxApiService } from '../services/fxApi';
 
 const { Content } = Layout;
 const { Title, Text } = Typography;
@@ -82,12 +83,10 @@ const PerformanceDashboard: React.FC = () => {
     setLoading(true);
     try {
       // Fetch daily performance
-      const dailyResponse = await fetch(`/api/v1/performance/daily?days=${selectedPeriod}`);
-      const dailyResult = await dailyResponse.json();
+      const dailyResult = await fxApiService.getPerformanceDaily(selectedPeriod);
       
       // Fetch summary stats
-      const summaryResponse = await fetch(`/api/v1/performance/summary?days=${selectedPeriod}`);
-      const summaryResult = await summaryResponse.json();
+      const summaryResult = await fxApiService.getPerformanceSummary(selectedPeriod);
       
       if (dailyResult.success) {
         setDailyData(dailyResult.data);

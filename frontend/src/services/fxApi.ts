@@ -293,6 +293,29 @@ export class FxApiService {
     console.log('リアルタイム更新を停止しました');
   }
 
+  // パフォーマンス関連API
+  async getPerformanceSummary(days: number = 30): Promise<any> {
+    try {
+      const params = new URLSearchParams({ days: days.toString() });
+      const response = await this.makeBackendRequest('/performance/summary', params);
+      return response;
+    } catch (error) {
+      console.error('Performance summary fetch error:', error);
+      throw error;
+    }
+  }
+
+  async getPerformanceDaily(days: number = 30): Promise<any> {
+    try {
+      const params = new URLSearchParams({ days: days.toString() });
+      const response = await this.makeBackendRequest('/performance/daily', params);
+      return response;
+    } catch (error) {
+      console.error('Performance daily fetch error:', error);
+      throw error;
+    }
+  }
+
   // Backend形式への変換
   private convertSymbolToBackend(symbol: CurrencyPair): string {
     // フロントエンド形式 'USDJPY' → Backend形式 'USD/JPY'

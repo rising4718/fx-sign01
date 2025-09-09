@@ -1,6 +1,6 @@
 # FX Pattern Analyzer - 東京時間特化型サインツール
 
-![Status](https://img.shields.io/badge/Status-Production%20Ready-brightgreen) ![Version](https://img.shields.io/badge/Version-v2.2.0-blue) ![License](https://img.shields.io/badge/License-Private-red) ![CI/CD](https://img.shields.io/badge/GitHub%20Actions-Active-success)
+![Status](https://img.shields.io/badge/Status-Production%20Ready-brightgreen) ![Version](https://img.shields.io/badge/Version-v2.4.0-blue) ![License](https://img.shields.io/badge/License-Private-red) ![CI/CD](https://img.shields.io/badge/GitHub%20Actions-Active-success)
 
 ## 🎯 プロジェクト概要
 
@@ -155,7 +155,7 @@ npm run dev
 # バックエンド開発 (別ターミナル)  
 cd backend
 npm install
-npm run dev
+NODE_ENV=development npm run dev
 # → http://localhost:3002 (開発用エンドポイント有効)
 ```
 
@@ -163,6 +163,7 @@ npm run dev
 - `NODE_ENV=development` で自動有効
 - モックユーザー（PRO会員）で全機能利用可能
 - 本番環境では完全無効（セキュリティ保証）
+- **⚠️ 重要**: バックエンドは必ず`NODE_ENV=development`で起動
 
 ### 🚀 本番デプロイ (GitHub Actions自動化)
 
