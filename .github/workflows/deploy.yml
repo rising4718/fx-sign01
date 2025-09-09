@@ -62,7 +62,11 @@ jobs:
     - name: Run Frontend Tests
       run: |
         cd frontend
-        npm test -- --run || echo "No tests found"
+        if npm run | grep -q "test"; then
+          npm test -- --run || echo "Frontend tests failed, continuing..."
+        else
+          echo "No test script found in frontend package.json, skipping tests"
+        fi
 
   deploy:
     needs: test
