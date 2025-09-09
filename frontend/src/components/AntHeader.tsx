@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Layout, Typography, Menu, Space, Tag, Button } from 'antd';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
-  HomeOutlined,
   BarChartOutlined,
   SettingOutlined,
   FileTextOutlined,

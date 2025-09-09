@@ -108,7 +108,7 @@ const TradingPage: React.FC = () => {
     const hour = jst.getHours();
     
     // デバッグログ（開発環境のみ）
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.MODE === 'development') {
       console.log(`Session check - UTC: ${now.toISOString()}, JST: ${jst.toISOString()}, Hour: ${hour}`);
     }
     
