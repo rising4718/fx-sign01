@@ -6,12 +6,22 @@ import AntHeader from '../components/AntHeader';
 import { fxApiService } from '../services/fxApi';
 import { useSettings } from '../contexts/SettingsContext';
 import { getCurrentJST } from '../utils/timeUtils';
+import { TradingSimulator, createDefaultAccount, TradeParameters } from '../utils/tradingSimulation';
 
 const { Content } = Layout;
 const { Text } = Typography;
 
 const TradingPage: React.FC = () => {
   const { settings, isDemo } = useSettings();
+  
+  // 取引シミュレーター初期化
+  const [tradingSimulator] = useState(() => new TradingSimulator({
+    balance: settings.account.balance,
+    leverage: settings.account.leverage,
+    marginRequirement: settings.account.marginRequirement,
+    riskPercent: settings.account.riskPercent,
+    currency: settings.account.currency
+  }));
   const [currentPrice, setCurrentPrice] = useState<number>(150.123);
   const [chartData, setChartData] = useState<any[]>([]);
   const [detailChartData, setDetailChartData] = useState<any[]>([]);

@@ -16,6 +16,15 @@ interface DemoSettings {
   pipValue: number;
 }
 
+interface AccountSettings {
+  balance: number;
+  leverage: 1 | 10 | 25;
+  marginRequirement: number;
+  riskPercent: number;
+  currency: 'JPY';
+  broker: 'GMO' | 'OANDA' | 'DEMO';
+}
+
 interface RealSettings {
   brokerId: string;
   apiKey: string;
@@ -51,6 +60,7 @@ interface AppSettings {
   real: RealSettings;
   notifications: NotificationSettings;
   risk: RiskSettings;
+  account: AccountSettings;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -92,6 +102,14 @@ const DEFAULT_SETTINGS: AppSettings = {
     dailyLossLimit: 30000,
     maxDailyTrades: 10,
     emergencyStop: true,
+  },
+  account: {
+    balance: 100000,
+    leverage: 25,
+    marginRequirement: 4.0,
+    riskPercent: 2.0,
+    currency: 'JPY',
+    broker: 'GMO',
   },
 };
 
