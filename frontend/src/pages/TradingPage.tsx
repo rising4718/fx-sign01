@@ -14,12 +14,12 @@ const { Text } = Typography;
 const TradingPage: React.FC = () => {
   const { settings, isDemo } = useSettings();
   
-  // 取引シミュレーター初期化（設定が未定義の場合はデフォルト値を使用）
+  // 取引シミュレーター初期化（デモ設定の初期残高を使用）
   const [tradingSimulator] = useState(() => new TradingSimulator({
-    balance: settings?.account?.balance || 100000,
+    balance: settings?.demo?.initialBalance || settings?.account?.balance || 300000,
     leverage: settings?.account?.leverage || 25,
     marginRequirement: settings?.account?.marginRequirement || 4.0,
-    riskPercent: settings?.account?.riskPercent || 2.0,
+    riskPercent: settings?.demo?.riskPercentage || settings?.account?.riskPercent || 2.0,
     currency: settings?.account?.currency || 'JPY'
   }));
   const [currentPrice, setCurrentPrice] = useState<number>(150.123);
@@ -37,6 +37,33 @@ const TradingPage: React.FC = () => {
     return saved ? JSON.parse(saved) : {};
   });
   const [lastCandleSwitch, setLastCandleSwitch] = useState<Date | null>(null);
+  const [cumulativePnL, setCumulativePnL] = useState<number>(0);
+  const [priceUpdateInfo, setPriceUpdateInfo] = useState<{
+    lastUpdateTime: Date | null;
+    updateCount: number;
+    lastChange: number;
+    apiSuccessCount: number;
+    fallbackCount: number;
+  }>({
+    lastUpdateTime: null,
+    updateCount: 0,
+    lastChange: 0,
+    apiSuccessCount: 0,
+    fallbackCount: 0
+  });
+
+  // 現在残高を取得する関数
+  const getCurrentBalance = () => {
+    const today = new Date().toLocaleDateString('ja-JP');
+    const stats = dailyStats[today];
+    const initialBalance = isDemo ? settings.demo.initialBalance : settings.demo.initialBalance;
+    
+    if (!stats) return initialBalance;
+    
+    // 累積PnLから現在残高を計算
+    const totalPnL = stats.totalPnL || 0;
+    return initialBalance + totalPnL;
+  };
 
   // TORB状態を計算する関数
   const getTorbStatus = () => {
@@ -94,7 +121,24 @@ const TradingPage: React.FC = () => {
     if (hour >= 2 && hour < 6) return { name: 'NY後半', color: '#ff7875' };
     return { name: 'オフ', color: '#8c8c8c' };
   };
-  
+
+  // 現実的な損益計算関数（TradingSimulatorを使用）
+  const calculateRealisticPnL = (signal: any, exitPrice: number): number => {
+    if (!signal || !currentRange) return 0;
+
+    const tradeParams: TradeParameters = {
+      symbol: 'USD/JPY',
+      direction: signal.type,
+      entryPrice: signal.entryPrice,
+      stopLoss: signal.stopPrice,
+      takeProfit: signal.targetPrice,
+      torbRangeWidth: currentRange.width
+    };
+
+    const result = tradingSimulator.simulateTrade(tradeParams, exitPrice);
+    return result.isValidTrade ? result.pnl : 0;
+  };
+
   // TORBロジック設定（ローカルストレージから取得）
   const [torbSettings, setTorbSettings] = useState(() => {
     const saved = localStorage.getItem('torbSettings');
@@ -126,8 +170,37 @@ const TradingPage: React.FC = () => {
     const now = new Date();
     let currentCandleStart = get15MinuteTime(now);
     
-    // 初期データ生成（過去19本 + 現在進行中の1本）
-    const generateInitialData = () => {
+    // 実際のAPIから初期データを取得
+    const fetchInitialData = async () => {
+      try {
+        console.log('🔄 実際のFXデータを取得中...');
+        const candleData = await fxApiService.getHistoricalData('USDJPY', '15m', 20);
+        
+        if (candleData && candleData.length > 0) {
+          console.log('✅ 実際のAPIデータを取得しました:', candleData.length + '本');
+          const formattedData = candleData.map((candle: any) => ({
+            time: Math.floor(new Date(candle.time || candle.timestamp).getTime() / 1000),
+            open: Number(candle.open.toFixed(3)),
+            high: Number(candle.high.toFixed(3)),
+            low: Number(candle.low.toFixed(3)),
+            close: Number(candle.close.toFixed(3))
+          }));
+          
+          return formattedData;
+        } else {
+          console.log('⚠️ APIからデータが取得できませんでした。フォールバックデータを使用します。');
+          return generateFallbackData();
+        }
+      } catch (error) {
+        console.error('❌ APIデータ取得エラー:', error);
+        console.log('⚠️ フォールバックデータを使用します。');
+        return generateFallbackData();
+      }
+    };
+    
+    // APIエラー時のフォールバックデータ生成
+    const generateFallbackData = () => {
+      console.log('📊 フォールバックデータを生成中...');
       const data = [];
       
       // 過去19本の完成されたローソク足（正確な15分刻み）
@@ -239,8 +312,28 @@ const TradingPage: React.FC = () => {
       }
     };
 
-    // 日別統計更新
-    const updateDailyStats = (signal: any, result?: 'win' | 'loss' | null) => {
+    // リアルなPnL計算関数
+    const calculateRealisticPnL = (signal: any, exitPrice: number): number => {
+      try {
+        const tradeParams: TradeParameters = {
+          symbol: 'USD/JPY',
+          direction: signal.type,
+          entryPrice: signal.entryPrice,
+          stopLoss: signal.stopPrice,
+          takeProfit: signal.targetPrice,
+          torbRangeWidth: currentRange?.width || 20
+        };
+        
+        const result = tradingSimulator.simulateTrade(tradeParams, exitPrice);
+        return result.isValidTrade ? result.pnl : 0;
+      } catch (error) {
+        console.error('PnL計算エラー:', error);
+        return 0;
+      }
+    };
+
+    // 日別統計更新（リアルPnL対応版）
+    const updateDailyStats = (signal: any, result?: 'win' | 'loss' | null, pnlAmount?: number) => {
       const today = new Date().toLocaleDateString('ja-JP');
       const updatedStats = { ...dailyStats };
       
@@ -250,6 +343,7 @@ const TradingPage: React.FC = () => {
           wins: 0,
           losses: 0,
           winRate: 0,
+          totalPnL: 0,
           signals: []
         };
       }
@@ -262,13 +356,16 @@ const TradingPage: React.FC = () => {
           id: Date.now(),
           status: 'active'
         });
-      } else if (result) {
-        // シグナル結果更新時
+      } else if (result && pnlAmount !== undefined) {
+        // シグナル結果更新時（リアルPnLを記録）
         if (result === 'win') {
           updatedStats[today].wins += 1;
         } else if (result === 'loss') {
           updatedStats[today].losses += 1;
         }
+        
+        // 累積PnLを更新
+        updatedStats[today].totalPnL = (updatedStats[today].totalPnL || 0) + pnlAmount;
         
         // 勝率計算
         const completed = updatedStats[today].wins + updatedStats[today].losses;
@@ -351,6 +448,9 @@ const TradingPage: React.FC = () => {
           ? (currentPrice - activeSignal.entryPrice) * 10000 
           : (activeSignal.entryPrice - currentPrice) * 10000;
         
+        // リアルなPnL計算
+        const realisticPnL = calculateRealisticPnL(activeSignal, currentPrice);
+        
         // 取引履歴を更新
         const updatedHistory = tradingHistory.map((trade: any) => {
           if (trade.entryPrice === activeSignal.entryPrice && trade.status === 'active') {
@@ -360,6 +460,7 @@ const TradingPage: React.FC = () => {
               exitPrice: currentPrice,
               result,
               pips: Number(pips.toFixed(1)),
+              pnl: realisticPnL,
               status: 'completed',
               closeReason: reason
             };
@@ -377,6 +478,7 @@ const TradingPage: React.FC = () => {
               ...signal,
               result,
               pips: Number(pips.toFixed(1)),
+              pnl: realisticPnL,
               exitPrice: currentPrice,
               closeReason: reason
             };
@@ -384,95 +486,165 @@ const TradingPage: React.FC = () => {
           return signal;
         }));
         
-        // 日別統計を更新
-        updateDailyStats(activeSignal, result);
+        // 累積PnLを更新
+        setCumulativePnL(prev => prev + realisticPnL);
+        
+        // 日別統計を更新（リアルPnLを渡す）
+        updateDailyStats(activeSignal, result, realisticPnL);
         
         // アクティブシグナルをクリア
         setActiveSignal(null);
         
-        console.log(`🎯 自動決済: ${activeSignal.type.toUpperCase()} ${activeSignal.entryPrice} → ${currentPrice} (${result}: ${pips.toFixed(1)} pips) - ${reason}`);
+        console.log(`🎯 自動決済: ${activeSignal.type.toUpperCase()} ${activeSignal.entryPrice} → ${currentPrice} (${result}: ${pips.toFixed(1)} pips / ¥${realisticPnL.toFixed(0)}) - ${reason}`);
       }
     };
 
-    // 最後のローソク足を更新する関数（15分以内の価格変動）
-    const updateCurrentCandle = (prevData: any[]) => {
+    // 最後のローソク足をリアルタイムAPIで更新する関数
+    const updateCurrentCandle = async (prevData: any[]) => {
       if (prevData.length === 0) return prevData;
       
+      try {
+        // 実際の現在価格を取得
+        const currentPriceData = await fxApiService.getCurrentPrice('USDJPY');
+        if (currentPriceData) {
+          const newPrice = currentPriceData.price;
+          
+          const newData = [...prevData];
+          const lastCandle = newData[newData.length - 1];
+          const now = new Date();
+          
+          // 実際の15分区切り時刻をチェック
+          const next15MinTime = get15MinuteTime(new Date(currentCandleStart.getTime() + 15 * 60 * 1000));
+          
+          // 現在時刻が次の15分区切り時刻に達したかチェック
+          if (now >= next15MinTime) {
+            // 新しい15分足を開始
+            currentCandleStart = next15MinTime;
+            const newCandleTime = Math.floor(currentCandleStart.getTime() / 1000);
+            const newOpen = lastCandle.close;
+            
+            const switchTime = new Date();
+            console.log(`🕐 新しいローソク足作成 (実価格): ${switchTime.toLocaleTimeString('ja-JP')} (予定時刻: ${next15MinTime.toLocaleTimeString('ja-JP')})`);
+            setLastCandleSwitch(switchTime);
+            
+            const newCandle = {
+              time: newCandleTime,
+              open: Number(newOpen.toFixed(3)),
+              high: Number(newPrice.toFixed(3)),
+              low: Number(newPrice.toFixed(3)),
+              close: Number(newPrice.toFixed(3))
+            };
+            
+            newData.push(newCandle);
+            
+            // 20本以上になったら古いデータを削除
+            if (newData.length > 20) {
+              newData.shift();
+            }
+            
+            // TORB計算を実行
+            calculateRange(newData);
+            
+            return newData;
+          } else {
+            // 現在のローソク足をリアルタイム価格で更新
+            const newHigh = Math.max(lastCandle.high, newPrice);
+            const newLow = Math.min(lastCandle.low, newPrice);
+            
+            newData[newData.length - 1] = {
+              ...lastCandle,
+              high: Number(newHigh.toFixed(3)),
+              low: Number(newLow.toFixed(3)),
+              close: Number(newPrice.toFixed(3))
+            };
+            
+            // 現在価格を更新
+            setCurrentPrice(newPrice);
+            
+            // TORB計算を実行
+            calculateRange(newData);
+            
+            // アクティブシグナルの自動決済チェック
+            if (activeSignal) {
+              checkAutoClose(newPrice);
+            }
+            
+            return newData;
+          }
+        }
+      } catch (error) {
+        console.error('リアルタイム価格更新エラー:', error);
+        // APIエラー時はフォールバック処理
+        return updateCandleWithFallback(prevData);
+      }
+      
+      return prevData;
+    };
+    
+    // APIエラー時のフォールバック更新
+    const updateCandleWithFallback = (prevData: any[]) => {
+      console.log('⚠️ フォールバック価格更新を使用');
       const newData = [...prevData];
       const lastCandle = newData[newData.length - 1];
-      const now = new Date();
+      const volatility = 0.002;
+      const priceChange = (Math.random() - 0.5) * volatility;
+      const newClose = lastCandle.close + priceChange;
       
-      // 実際の15分区切り時刻をチェック
-      const next15MinTime = get15MinuteTime(new Date(currentCandleStart.getTime() + 15 * 60 * 1000));
+      const newHigh = Math.max(lastCandle.high, newClose);
+      const newLow = Math.min(lastCandle.low, newClose);
       
-      // 現在時刻が次の15分区切り時刻に達したかチェック
-      if (now >= next15MinTime) {
-        // 新しい15分足を開始
-        currentCandleStart = next15MinTime;
-        const newCandleTime = Math.floor(currentCandleStart.getTime() / 1000);
-        const newOpen = lastCandle.close;
-        
-        // デバッグログ：新しいローソク足作成
-        const switchTime = new Date();
-        console.log(`🕐 新しいローソク足作成: ${switchTime.toLocaleTimeString('ja-JP')} (予定時刻: ${next15MinTime.toLocaleTimeString('ja-JP')})`);
-        setLastCandleSwitch(switchTime);
-        
-        const newCandle = {
-          time: newCandleTime,
-          open: Number(newOpen.toFixed(3)),
-          high: Number(newOpen.toFixed(3)),
-          low: Number(newOpen.toFixed(3)),
-          close: Number(newOpen.toFixed(3))
-        };
-        
-        newData.push(newCandle);
-        
-        // 20本以上になったら古いデータを削除
-        if (newData.length > 20) {
-          newData.shift();
-        }
-        
-        // TORB計算を実行
-        calculateRange(newData);
-        
-        return newData;
-      } else {
-        // 現在のローソク足を更新
-        const volatility = 0.002;
-        const priceChange = (Math.random() - 0.5) * volatility;
-        const newClose = lastCandle.close + priceChange;
-        
-        // high/lowを適切に更新
-        const newHigh = Math.max(lastCandle.high, newClose);
-        const newLow = Math.min(lastCandle.low, newClose);
-        
-        newData[newData.length - 1] = {
-          ...lastCandle,
-          high: Number(newHigh.toFixed(3)),
-          low: Number(newLow.toFixed(3)),
-          close: Number(newClose.toFixed(3))
-        };
-        
-        // 現在価格を更新
-        setCurrentPrice(newClose);
-        
-        // TORB計算を実行
-        calculateRange(newData);
-        
-        // アクティブシグナルの自動決済チェック
+      newData[newData.length - 1] = {
+        ...lastCandle,
+        high: Number(newHigh.toFixed(3)),
+        low: Number(newLow.toFixed(3)),
+        close: Number(newClose.toFixed(3))
+      };
+      
+      setCurrentPrice(newClose);
+      
+      if (activeSignal) {
         checkAutoClose(newClose);
-        
-        return newData;
       }
+      
+      return newData;
     };
 
-    // 初期データ設定
-    const initialData = generateInitialData();
-    setChartData(initialData);
-    setCurrentPrice(initialData[initialData.length - 1]?.close || 150.123);
+    // 初期データを非同期で取得・設定
+    const initializeData = async () => {
+      const initialData = await fetchInitialData();
+      setChartData(initialData);
+      setCurrentPrice(initialData[initialData.length - 1]?.close || 150.123);
+      
+      // 初期TORB計算
+      calculateRange(initialData);
+    };
     
-    // 5分足データ取得（12本）
-    const generate5MinData = () => {
+    initializeData();
+    
+    // 5分足データをAPIから取得（12本）
+    const fetch5MinData = async () => {
+      try {
+        console.log('🔄 5分足の実際のFXデータを取得中...');
+        const candleData = await fxApiService.getHistoricalData('USDJPY', '5m', 12);
+        
+        if (candleData && candleData.length > 0) {
+          console.log('✅ 5分足の実際のAPIデータを取得しました:', candleData.length + '本');
+          const formattedData = candleData.map((candle: any) => ({
+            time: Math.floor(new Date(candle.time || candle.timestamp).getTime() / 1000),
+            open: Number(candle.open.toFixed(3)),
+            high: Number(candle.high.toFixed(3)),
+            low: Number(candle.low.toFixed(3)),
+            close: Number(candle.close.toFixed(3))
+          }));
+          
+          return formattedData;
+        }
+      } catch (error) {
+        console.error('❌ 5分足APIデータ取得エラー:', error);
+      }
+      
+      // フォールバック：モックデータ生成
+      console.log('⚠️ 5分足フォールバックデータを使用');
       const data = [];
       let detailPrice = basePrice;
       
@@ -499,39 +671,143 @@ const TradingPage: React.FC = () => {
       return data;
     };
 
-    const detail5MinData = generate5MinData();
-    setDetailChartData(detail5MinData);
+    // 5分足データを非同期で取得・設定
+    const initialize5MinData = async () => {
+      const detail5MinData = await fetch5MinData();
+      setDetailChartData(detail5MinData);
+    };
     
-    // 初期TORB計算
-    calculateRange(initialData);
+    initialize5MinData();
 
     // 1秒ごとに現在のローソク足を更新（リアルタイム価格変動）
-    const interval = setInterval(() => {
-      setChartData(prevData => {
-        const updatedData = updateCurrentCandle(prevData);
-        
-        // 5分足データも同期して更新
-        if (updatedData.length > 0) {
-          const latestPrice = updatedData[updatedData.length - 1].close;
-          setDetailChartData(prevDetailData => {
-            const newDetailData = [...prevDetailData];
-            if (newDetailData.length > 0) {
-              const lastDetailCandle = newDetailData[newDetailData.length - 1];
-              
-              // 最後の5分足も現在価格で更新
-              newDetailData[newDetailData.length - 1] = {
-                ...lastDetailCandle,
-                high: Math.max(lastDetailCandle.high, latestPrice),
-                low: Math.min(lastDetailCandle.low, latestPrice),
-                close: latestPrice
-              };
-            }
-            return newDetailData;
+    const interval = setInterval(async () => {
+      console.log('🔄 setInterval実行中:', new Date().toLocaleTimeString());
+      
+      try {
+        // 直接現在価格を取得して更新
+        const currentPriceData = await fxApiService.getCurrentPrice('USDJPY');
+        if (currentPriceData) {
+          console.log('✅ 現在価格取得成功:', currentPriceData.price);
+          const change = currentPriceData.price - currentPrice;
+          console.log('💰 価格表示更新:', {
+            previousPrice: currentPrice,
+            newPrice: currentPriceData.price,
+            change: change,
+            timestamp: new Date().toLocaleTimeString()
+          });
+          setCurrentPrice(currentPriceData.price);
+          setPriceUpdateInfo(prev => ({
+            lastUpdateTime: new Date(),
+            updateCount: prev.updateCount + 1,
+            lastChange: change,
+            apiSuccessCount: prev.apiSuccessCount + 1,
+            fallbackCount: prev.fallbackCount
+          }));
+        } else {
+          console.warn('⚠️ 現在価格取得失敗、フォールバック価格を生成');
+          // フォールバック処理: 現在価格から小さな変動を生成
+          setCurrentPrice(prev => {
+            const volatility = 0.002;
+            const priceChange = (Math.random() - 0.5) * volatility;
+            const newPrice = Number((prev + priceChange).toFixed(3));
+            console.log('🎲 フォールバック価格生成:', {
+              previousPrice: prev,
+              newPrice: newPrice,
+              change: priceChange,
+              volatility: volatility,
+              timestamp: new Date().toLocaleTimeString()
+            });
+            setPriceUpdateInfo(prevInfo => ({
+              lastUpdateTime: new Date(),
+              updateCount: prevInfo.updateCount + 1,
+              lastChange: priceChange,
+              apiSuccessCount: prevInfo.apiSuccessCount,
+              fallbackCount: prevInfo.fallbackCount + 1
+            }));
+            return newPrice;
           });
         }
         
-        return updatedData;
-      });
+        // 現在のチャートデータを元に更新を実行（直接非同期処理）
+        setChartData(currentChartData => {
+          // 非同期でチャートデータ更新を実行
+          (async () => {
+            try {
+              console.log('📈 チャートデータ更新開始');
+              const updatedData = await updateCurrentCandle(currentChartData);
+              if (updatedData && updatedData !== currentChartData) {
+                console.log('✅ チャートデータ更新成功');
+                setChartData(updatedData);
+                
+                // 5分足データもリアルタイムで適切に更新
+                if (updatedData.length > 0) {
+                  const latestPrice = updatedData[updatedData.length - 1].close;
+                  console.log('🕐 5分足チャートデータ更新中:', latestPrice);
+                  
+                  setDetailChartData(prevDetailData => {
+                    const newDetailData = [...prevDetailData];
+                    if (newDetailData.length === 0) return newDetailData;
+                    
+                    const now = new Date();
+                    
+                    // 5分区切り時刻を計算（JST基準）
+                    const get5MinuteTime = (date: Date) => {
+                      const minutes = date.getMinutes();
+                      const roundedMinutes = Math.floor(minutes / 5) * 5;
+                      return new Date(date.getFullYear(), date.getMonth(), date.getDate(), date.getHours(), roundedMinutes, 0, 0);
+                    };
+                    
+                    const current5MinTime = get5MinuteTime(now);
+                    const current5MinUnix = Math.floor(current5MinTime.getTime() / 1000);
+                    const lastCandle = newDetailData[newDetailData.length - 1];
+                    
+                    // 新しい5分区切り時間に達したかチェック
+                    if (current5MinUnix > lastCandle.time) {
+                      // 新しい5分足を開始
+                      const newCandle = {
+                        time: current5MinUnix,
+                        open: lastCandle.close,
+                        high: latestPrice,
+                        low: latestPrice,
+                        close: latestPrice
+                      };
+                      
+                      newDetailData.push(newCandle);
+                      
+                      // 12本以上になったら古いデータを削除
+                      if (newDetailData.length > 12) {
+                        newDetailData.shift();
+                      }
+                      
+                      console.log(`🆕 新しい5分足作成: ${current5MinTime.toLocaleTimeString('ja-JP')}`);
+                    } else {
+                      // 現在の5分足を更新
+                      newDetailData[newDetailData.length - 1] = {
+                        ...lastCandle,
+                        high: Math.max(lastCandle.high, latestPrice),
+                        low: Math.min(lastCandle.low, latestPrice),
+                        close: latestPrice
+                      };
+                      console.log('📊 5分足更新完了:', latestPrice);
+                    }
+                    
+                    return newDetailData;
+                  });
+                }
+              } else {
+                console.log('⚠️ チャートデータ変更なし');
+              }
+            } catch (error) {
+              console.error('❌ チャートデータ更新エラー:', error);
+            }
+          })();
+          
+          // 現在の状態をそのまま返す
+          return currentChartData;
+        });
+      } catch (error) {
+        console.error('setInterval更新エラー:', error);
+      }
     }, 1000);
 
     return () => clearInterval(interval);
@@ -569,13 +845,7 @@ const TradingPage: React.FC = () => {
                   <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
                     <Text style={{ fontSize: '12px', color: '#8c8c8c' }}>残高</Text>
                     <Text style={{ fontSize: '15px', fontWeight: 'bold', color: '#52c41a' }}>
-                      {(() => {
-                        const today = new Date().toLocaleDateString('ja-JP');
-                        const stats = dailyStats[today];
-                        const totalPnL = stats ? (stats.wins * 5000) - (stats.losses * 3000) : 0;
-                        const initialBalance = isDemo ? settings.demo.initialBalance : settings.demo.initialBalance;
-                        return `¥${(initialBalance + totalPnL).toLocaleString()}`;
-                      })()}
+                      ¥{getCurrentBalance().toLocaleString()}
                     </Text>
                   </div>
                   <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
@@ -586,22 +856,32 @@ const TradingPage: React.FC = () => {
                       color: (() => {
                         const today = new Date().toLocaleDateString('ja-JP');
                         const stats = dailyStats[today];
-                        const totalPnL = stats ? (stats.wins * 5000) - (stats.losses * 3000) : 0;
+                        const totalPnL = stats?.totalPnL || 0;
                         return totalPnL >= 0 ? '#52c41a' : '#ff4d4f';
                       })()
                     }}>
                       {(() => {
                         const today = new Date().toLocaleDateString('ja-JP');
                         const stats = dailyStats[today];
-                        const totalPnL = stats ? (stats.wins * 5000) - (stats.losses * 3000) : 0;
-                        return `${totalPnL >= 0 ? '+' : ''}¥${totalPnL.toLocaleString()}`;
+                        const totalPnL = stats?.totalPnL || 0;
+                        return `${totalPnL >= 0 ? '+' : ''}¥${Math.round(totalPnL).toLocaleString()}`;
                       })()}
                     </Text>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <Text style={{ fontSize: '12px', color: '#8c8c8c' }}>DD</Text>
                     <Text style={{ fontSize: '15px', fontWeight: 'bold', color: '#ff4d4f' }}>
-                      -¥12,000
+                      {(() => {
+                        // 今日の最大ドローダウンを計算（簡易版）
+                        const today = new Date().toLocaleDateString('ja-JP');
+                        const stats = dailyStats[today];
+                        if (!stats) return '¥0';
+                        
+                        // 負の最大PnLをドローダウンとして表示
+                        const totalPnL = stats.totalPnL || 0;
+                        const drawdown = totalPnL < 0 ? totalPnL : 0;
+                        return `¥${Math.round(drawdown).toLocaleString()}`;
+                      })()}
                     </Text>
                   </div>
                 </Card>
@@ -627,7 +907,12 @@ const TradingPage: React.FC = () => {
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <Text style={{ fontSize: '12px', color: '#8c8c8c' }}>証拠金</Text>
                     <Text style={{ fontSize: '15px', fontWeight: 'bold', color: '#fa8c16' }}>
-                      23%
+                      {(() => {
+                        const marginUsed = activeSignal ? 
+                          (settings.demo.lotSize * currentPrice * 0.04) : 0; // 4%証拠金
+                        const marginRatio = marginUsed / getCurrentBalance() * 100;
+                        return marginRatio > 0 ? `${marginRatio.toFixed(1)}%` : '0%';
+                      })()}
                     </Text>
                   </div>
                 </Card>
@@ -660,17 +945,16 @@ const TradingPage: React.FC = () => {
                           fontSize: '15px', 
                           fontWeight: 'bold',
                           color: (() => {
-                            const pips = activeSignal.type === 'buy' 
-                              ? (currentPrice - activeSignal.entryPrice) * 10000 
-                              : (activeSignal.entryPrice - currentPrice) * 10000;
-                            return pips >= 0 ? '#52c41a' : '#ff4d4f';
+                            const unrealizedPnL = calculateRealisticPnL(activeSignal, currentPrice);
+                            return unrealizedPnL >= 0 ? '#52c41a' : '#ff4d4f';
                           })()
                         }}>
                           {(() => {
+                            const unrealizedPnL = calculateRealisticPnL(activeSignal, currentPrice);
                             const pips = activeSignal.type === 'buy' 
                               ? (currentPrice - activeSignal.entryPrice) * 10000 
                               : (activeSignal.entryPrice - currentPrice) * 10000;
-                            return `${pips >= 0 ? '+' : ''}${pips.toFixed(1)}p`;
+                            return `${unrealizedPnL >= 0 ? '+' : ''}¥${Math.round(unrealizedPnL).toLocaleString()} (${pips >= 0 ? '+' : ''}${pips.toFixed(1)}p)`;
                           })()}
                         </Text>
                       </div>
@@ -856,6 +1140,43 @@ const TradingPage: React.FC = () => {
                 <div>
                   <Text strong>データ本数: </Text>
                   <Text>15分足: {chartData.length}本 / 5分足: {detailChartData.length}本</Text>
+                </div>
+              </Space>
+            </Card>
+          </Col>
+          <Col xs={24}>
+            <Card title="💰 価格更新状況">
+              <Space direction="vertical" style={{ width: '100%' }}>
+                <div>
+                  <Text strong>総更新回数: </Text>
+                  <Text>{priceUpdateInfo.updateCount}回</Text>
+                </div>
+                <div>
+                  <Text strong>API成功: </Text>
+                  <Text style={{ color: '#52c41a' }}>{priceUpdateInfo.apiSuccessCount}回</Text>
+                  <Text strong style={{ marginLeft: '16px' }}>フォールバック: </Text>
+                  <Text style={{ color: '#faad14' }}>{priceUpdateInfo.fallbackCount}回</Text>
+                </div>
+                <div>
+                  <Text strong>最終更新: </Text>
+                  <Text>{priceUpdateInfo.lastUpdateTime ? priceUpdateInfo.lastUpdateTime.toLocaleTimeString('ja-JP') : '未更新'}</Text>
+                </div>
+                <div>
+                  <Text strong>最後の変動: </Text>
+                  <Text style={{ color: priceUpdateInfo.lastChange >= 0 ? '#52c41a' : '#ff4d4f' }}>
+                    {priceUpdateInfo.lastChange >= 0 ? '+' : ''}{priceUpdateInfo.lastChange.toFixed(5)}
+                  </Text>
+                </div>
+                <div>
+                  <Text strong>成功率: </Text>
+                  <Text style={{ 
+                    color: priceUpdateInfo.updateCount > 0 && 
+                           (priceUpdateInfo.apiSuccessCount / priceUpdateInfo.updateCount) > 0.8 ? 
+                           '#52c41a' : '#faad14' 
+                  }}>
+                    {priceUpdateInfo.updateCount > 0 ? 
+                     Math.round((priceUpdateInfo.apiSuccessCount / priceUpdateInfo.updateCount) * 100) : 0}%
+                  </Text>
                 </div>
               </Space>
             </Card>
