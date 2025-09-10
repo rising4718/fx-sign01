@@ -6,13 +6,14 @@
 
 import { PrismaClient } from '@prisma/client';
 
-// Prisma Client のシングルトンインスタンス
-let prisma: PrismaClient | null = null;
-
+// グローバル変数の型定義
 declare global {
   // eslint-disable-next-line no-var
   var __prisma: PrismaClient | undefined;
 }
+
+// Prisma Client のシングルトンインスタンス
+let globalPrisma: PrismaClient | null = null;
 
 function createPrismaClient(): PrismaClient {
   try {
@@ -30,10 +31,10 @@ function createPrismaClient(): PrismaClient {
 // Initialize Prisma client with proper error handling
 function getPrismaClient(): PrismaClient {
   if (process.env.NODE_ENV === 'production') {
-    if (!prisma) {
-      prisma = createPrismaClient();
+    if (!globalPrisma) {
+      globalPrisma = createPrismaClient();
     }
-    return prisma;
+    return globalPrisma;
   } else {
     // 開発環境では Hot reload時にコネクションが増大するのを防ぐ
     if (!global.__prisma) {
