@@ -137,6 +137,11 @@ jobs:
           
           # Deploy database migrations (production standard)
           echo "📋 Deploying database migrations..."
+          # Check if migration table exists, if not baseline the existing database
+          if npx prisma migrate status | grep -q "No migration found"; then
+            echo "🔄 Baselining existing production database..."
+            npx prisma migrate resolve --applied 20250909092145_initial_schema || echo "Baseline resolution completed"
+          fi
           npx prisma migrate deploy || echo "Migration deployment completed"
           
           # Build backend
