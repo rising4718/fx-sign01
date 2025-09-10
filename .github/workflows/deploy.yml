@@ -112,7 +112,8 @@ jobs:
           # Set up environment variables and database
           echo "🗄️ Setting up database..."
           cd backend
-          export DATABASE_URL="postgresql://fxuser:fxpass123@localhost:5432/fx_sign_db"
+          echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> .env
+          export DATABASE_URL="${{ secrets.DATABASE_URL }}"
           
           # Clean install dependencies
           echo "📦 Installing dependencies..."
