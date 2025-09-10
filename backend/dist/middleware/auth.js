@@ -61,7 +61,7 @@ const requirePlan = (requiredPlan) => {
             });
             return;
         }
-        const planHierarchy = { 'free': 0, 'premium': 1, 'pro': 2 };
+        const planHierarchy = { 'free': 0, 'basic': 1, 'pro': 2 };
         const userLevel = planHierarchy[req.user.planType];
         const requiredLevel = planHierarchy[requiredPlan];
         if (userLevel < requiredLevel) {

@@ -119,9 +119,31 @@ jobs:
           rm -rf node_modules
           npm ci --only=production
           
-          # Generate Prisma client
-          echo "🛠️ Generating Prisma client..."
-          npx prisma generate
+          # Generate Prisma client multiple times to ensure success
+          echo "🛠️ Generating Prisma client (attempt 1)..."
+          npx prisma generate || echo "First attempt failed"
+          
+          echo "🛠️ Generating Prisma client (attempt 2)..."
+          npx prisma generate || echo "Second attempt failed"
+          
+          # Verify client generation
+          echo "✅ Verifying Prisma client..."
+          ls -la node_modules/.prisma/client/index.js || echo "Client not found"
+          
+          # Test import
+          echo "🧪 Testing Prisma client import..."
+          node -e "
+          try {
+            const { PrismaClient } = require('@prisma/client');
+            console.log('✅ Prisma client import successful');
+            const client = new PrismaClient();
+            console.log('✅ Prisma client instantiation successful');
+            client.$disconnect();
+          } catch(e) {
+            console.error('❌ Prisma client test failed:', e.message);
+            process.exit(1);
+          }
+          "
           
           # Simple database sync (no migrations)
           echo "📋 Syncing database schema..."

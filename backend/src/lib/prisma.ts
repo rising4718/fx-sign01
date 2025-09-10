@@ -7,23 +7,40 @@
 import { PrismaClient } from '@prisma/client';
 
 // Prisma Client のシングルトンインスタンス
-let prisma: PrismaClient;
+let prisma: PrismaClient | null = null;
 
 declare global {
   // eslint-disable-next-line no-var
   var __prisma: PrismaClient | undefined;
 }
 
-if (process.env.NODE_ENV === 'production') {
-  prisma = new PrismaClient();
-} else {
-  // 開発環境では Hot reload時にコネクションが増大するのを防ぐ
-  if (!global.__prisma) {
-    global.__prisma = new PrismaClient({
-      log: ['query', 'info', 'warn', 'error'],
+function createPrismaClient(): PrismaClient {
+  try {
+    const client = new PrismaClient({
+      log: process.env.NODE_ENV === 'development' ? ['query', 'info', 'warn', 'error'] : ['error'],
     });
+    console.log('Prisma client created successfully');
+    return client;
+  } catch (error) {
+    console.error('Failed to create Prisma client:', error);
+    throw error;
   }
-  prisma = global.__prisma;
 }
 
-export { prisma };
+// Initialize Prisma client with proper error handling
+function getPrismaClient(): PrismaClient {
+  if (process.env.NODE_ENV === 'production') {
+    if (!prisma) {
+      prisma = createPrismaClient();
+    }
+    return prisma;
+  } else {
+    // 開発環境では Hot reload時にコネクションが増大するのを防ぐ
+    if (!global.__prisma) {
+      global.__prisma = createPrismaClient();
+    }
+    return global.__prisma;
+  }
+}
+
+export const prisma = getPrismaClient();

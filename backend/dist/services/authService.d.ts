@@ -1,4 +1,4 @@
-import { PlanType } from '../generated/prisma';
+export type PlanType = 'free' | 'basic' | 'pro';
 export interface User {
     id: number;
     email: string;
