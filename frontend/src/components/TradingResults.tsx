@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Card, 
   Table, 
@@ -12,19 +12,25 @@ import {
   Typography,
   Segmented,
   Empty,
-  Tag
+  Tag,
+  Badge,
+  Tooltip
 } from 'antd';
 import { 
   BarChartOutlined, 
   CalendarOutlined,
   DownloadOutlined,
   FilterOutlined,
-  TrophyOutlined
+  TrophyOutlined,
+  BoxPlotOutlined,
+  ArrowUpOutlined,
+  ArrowDownOutlined
 } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
 import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
 import weekOfYear from 'dayjs/plugin/weekOfYear';
+import { fxApiService } from '../services/fxApi';
 
 dayjs.extend(isSameOrAfter);
 dayjs.extend(isSameOrBefore);
@@ -32,6 +38,27 @@ dayjs.extend(weekOfYear);
 
 const { RangePicker } = DatePicker;
 const { Text } = Typography;
+
+interface TORBRange {
+  startTime: string;
+  endTime: string;
+  high: number;
+  low: number;
+  range: number;
+}
+
+interface TORBSignal {
+  id: string;
+  timestamp: string;
+  type: 'LONG' | 'SHORT';
+  entryPrice: number;
+  targetPrice: number;
+  stopLoss: number;
+  range: TORBRange;
+  rsi: number;
+  confidence: number;
+  status: 'ACTIVE' | 'COMPLETED';
+}
 
 interface TradeRecord {
   id: string;
@@ -42,6 +69,7 @@ interface TradeRecord {
   pips?: number;
   status: 'active' | 'completed';
   result?: 'win' | 'loss';
+  torbRange?: TORBRange;
 }
 
 const TradingResults: React.FC = () => {
@@ -50,10 +78,61 @@ const TradingResults: React.FC = () => {
     return saved ? JSON.parse(saved) : [];
   });
 
+  const [torbSignals, setTorbSignals] = useState<TORBSignal[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [showTORBData, setShowTORBData] = useState(false);
+
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs] | null>(null);
   const [viewType, setViewType] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const [filterStatus, setFilterStatus] = useState<'all' | 'completed' | 'active'>('all');
   const [filterResult, setFilterResult] = useState<'all' | 'win' | 'loss'>('all');
+
+  // TORBシグナル履歴を取得
+  useEffect(() => {
+    if (showTORBData) {
+      fetchTORBHistory();
+    }
+  }, [showTORBData, dateRange]);
+
+  const fetchTORBHistory = async () => {
+    setLoading(true);
+    try {
+      const days = dateRange ? Math.ceil(Math.abs(dateRange[1].diff(dateRange[0], 'day'))) : 30;
+      const response = await fxApiService.getTORBHistory('USDJPY', days, 100);
+      
+      if (response.success) {
+        setTorbSignals(response.data);
+      }
+    } catch (error) {
+      console.error('TORB履歴の取得に失敗しました:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // TORBレンジ品質の判定
+  const getRangeQuality = (rangePips: number): { label: string; color: string } => {
+    if (rangePips <= 50) return { label: '小', color: 'blue' };
+    if (rangePips <= 100) return { label: '中', color: 'orange' };
+    return { label: '大', color: 'red' };
+  };
+
+  // ブレイク方向の判定
+  const getBreakDirection = (signal: TORBSignal): { label: string; icon: React.ReactNode; color: string } => {
+    if (signal.type === 'LONG') {
+      return { 
+        label: '上抜け', 
+        icon: <ArrowUpOutlined />, 
+        color: 'green' 
+      };
+    } else {
+      return { 
+        label: '下抜け', 
+        icon: <ArrowDownOutlined />, 
+        color: 'red' 
+      };
+    }
+  };
 
   // フィルタリングされた取引データ
   const getFilteredTrades = () => {
@@ -202,6 +281,103 @@ const TradingResults: React.FC = () => {
         <Text style={{ color: pips >= 0 ? '#52c41a' : '#f5222d' }}>
           {pips >= 0 ? '+' : ''}{pips} pips
         </Text>
+      ),
+    },
+  ];
+
+  // TORBシグナル専用テーブルカラム
+  const torbColumns = [
+    {
+      title: '日時',
+      dataIndex: 'timestamp',
+      key: 'timestamp',
+      render: (timestamp: string) => dayjs(timestamp).format('MM/DD HH:mm'),
+      sorter: (a: TORBSignal, b: TORBSignal) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+    },
+    {
+      title: 'シグナル',
+      dataIndex: 'type',
+      key: 'type',
+      render: (type: string, record: TORBSignal) => {
+        const direction = getBreakDirection(record);
+        return (
+          <Tag color={direction.color} icon={direction.icon}>
+            {direction.label}
+          </Tag>
+        );
+      },
+    },
+    {
+      title: 'エントリー価格',
+      dataIndex: 'entryPrice',
+      key: 'entryPrice',
+      render: (price: number) => price.toFixed(3),
+    },
+    {
+      title: 'TORBレンジ',
+      key: 'torbRange',
+      render: (record: TORBSignal) => {
+        const quality = getRangeQuality(record.range.range);
+        return (
+          <Space direction="vertical" size="small" style={{ width: '100%' }}>
+            <div>
+              <Badge color={quality.color} text={`${quality.label} (${record.range.range} pips)`} />
+            </div>
+            <Text type="secondary" style={{ fontSize: '12px' }}>
+              {record.range.low.toFixed(3)} - {record.range.high.toFixed(3)}
+            </Text>
+            <Text type="secondary" style={{ fontSize: '12px' }}>
+              {dayjs(record.range.startTime).format('HH:mm')} - {dayjs(record.range.endTime).format('HH:mm')} JST
+            </Text>
+          </Space>
+        );
+      },
+    },
+    {
+      title: 'TP/SL',
+      key: 'tpsl',
+      render: (record: TORBSignal) => (
+        <Space direction="vertical" size="small">
+          <Text style={{ color: '#52c41a', fontSize: '12px' }}>
+            TP: {record.targetPrice.toFixed(3)}
+          </Text>
+          <Text style={{ color: '#f5222d', fontSize: '12px' }}>
+            SL: {record.stopLoss.toFixed(3)}
+          </Text>
+        </Space>
+      ),
+    },
+    {
+      title: 'RSI',
+      dataIndex: 'rsi',
+      key: 'rsi',
+      render: (rsi: number) => (
+        <Tag color={rsi > 70 ? 'red' : rsi < 30 ? 'green' : 'blue'}>
+          {rsi.toFixed(0)}
+        </Tag>
+      ),
+    },
+    {
+      title: '信頼度',
+      dataIndex: 'confidence',
+      key: 'confidence',
+      render: (confidence: number) => (
+        <Tooltip title={`信頼度: ${(confidence * 100).toFixed(1)}%`}>
+          <Badge 
+            count={`${(confidence * 100).toFixed(0)}%`} 
+            color={confidence > 0.8 ? 'green' : confidence > 0.6 ? 'orange' : 'red'}
+          />
+        </Tooltip>
+      ),
+    },
+    {
+      title: '状態',
+      dataIndex: 'status',
+      key: 'status',
+      render: (status: string) => (
+        <Tag color={status === 'COMPLETED' ? 'blue' : 'orange'}>
+          {status === 'COMPLETED' ? '完了' : 'アクティブ'}
+        </Tag>
       ),
     },
   ];
@@ -360,6 +536,21 @@ const TradingResults: React.FC = () => {
             />
           </Col>
           <Col xs={24} sm={4}>
+            <div>
+              <BoxPlotOutlined style={{ marginRight: '8px' }} />
+              <Text strong>データソース:</Text>
+            </div>
+            <Segmented 
+              options={[
+                { label: 'ローカル', value: false },
+                { label: 'TORB', value: true },
+              ]}
+              value={showTORBData}
+              onChange={(value) => setShowTORBData(value as boolean)}
+              style={{ marginTop: '4px' }}
+            />
+          </Col>
+          <Col xs={24} sm={4}>
             <div style={{ height: '22px' }}></div>
             <Space style={{ marginTop: '4px' }}>
               <Button onClick={() => {
@@ -418,30 +609,55 @@ const TradingResults: React.FC = () => {
         </Row>
       </Card>
 
-      {/* 期間別集計テーブル */}
-      <Card 
-        title={`${viewType === 'daily' ? '日別' : viewType === 'weekly' ? '週別' : '月別'}集計`}
-        style={{ marginBottom: '24px' }}
-      >
-        <Table
-          columns={aggregatedColumns}
-          dataSource={aggregatedData}
-          pagination={{ pageSize: 10 }}
-          scroll={{ x: 800 }}
-          size="small"
-        />
-      </Card>
+      {/* TORBデータ表示時 */}
+      {showTORBData ? (
+        <Card 
+          title={
+            <Space>
+              <BoxPlotOutlined />
+              TORBシグナル履歴
+              <Badge count={torbSignals.length} style={{ backgroundColor: '#52c41a' }} />
+              {loading && <Badge status="processing" text="読み込み中..." />}
+            </Space>
+          }
+        >
+          <Table
+            loading={loading}
+            columns={torbColumns}
+            dataSource={torbSignals.map((signal, index) => ({ ...signal, key: signal.id || index }))}
+            pagination={{ pageSize: 10 }}
+            scroll={{ x: 1200 }}
+            size="small"
+          />
+        </Card>
+      ) : (
+        <>
+          {/* 期間別集計テーブル */}
+          <Card 
+            title={`${viewType === 'daily' ? '日別' : viewType === 'weekly' ? '週別' : '月別'}集計`}
+            style={{ marginBottom: '24px' }}
+          >
+            <Table
+              columns={aggregatedColumns}
+              dataSource={aggregatedData}
+              pagination={{ pageSize: 10 }}
+              scroll={{ x: 800 }}
+              size="small"
+            />
+          </Card>
 
-      {/* 詳細取引履歴 */}
-      <Card title="取引履歴詳細">
-        <Table
-          columns={detailColumns}
-          dataSource={filteredTrades.map((trade, index) => ({ ...trade, key: trade.id || index }))}
-          pagination={{ pageSize: 15 }}
-          scroll={{ x: 600 }}
-          size="small"
-        />
-      </Card>
+          {/* 詳細取引履歴 */}
+          <Card title="取引履歴詳細">
+            <Table
+              columns={detailColumns}
+              dataSource={filteredTrades.map((trade, index) => ({ ...trade, key: trade.id || index }))}
+              pagination={{ pageSize: 15 }}
+              scroll={{ x: 600 }}
+              size="small"
+            />
+          </Card>
+        </>
+      )}
     </div>
   );
 };

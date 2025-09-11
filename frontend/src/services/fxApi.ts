@@ -81,8 +81,8 @@ export class FxApiService {
         (this.performanceMetrics.successRate * 0.95) + (0 * 0.05);
     }
 
-    if (latency > 100) {
-      console.warn(`⚠️ [Phase 4] 高レイテンシ検出: ${latency}ms`);
+    if (latency > 1000) {
+      console.debug(`⚠️ [Phase 4] 高レイテンシ検出: ${latency}ms`);
     }
   }
 
@@ -362,6 +362,62 @@ export class FxApiService {
       return response;
     } catch (error) {
       console.error('Performance daily fetch error:', error);
+      throw error;
+    }
+  }
+
+  // TORB関連API
+  async getTORBSignals(symbol: CurrencyPair = 'USDJPY'): Promise<any> {
+    try {
+      const backendSymbol = this.convertSymbolToBackend(symbol);
+      const params = new URLSearchParams({ symbol: backendSymbol });
+      const response = await this.makeBackendRequest('/torb/signals', params);
+      return response;
+    } catch (error) {
+      console.error('TORB signals fetch error:', error);
+      throw error;
+    }
+  }
+
+  async getTORBHistory(symbol: CurrencyPair = 'USDJPY', days: number = 30, limit: number = 100): Promise<any> {
+    try {
+      const backendSymbol = this.convertSymbolToBackend(symbol);
+      const params = new URLSearchParams({ 
+        symbol: backendSymbol,
+        days: days.toString(),
+        limit: limit.toString()
+      });
+      const response = await this.makeBackendRequest('/torb/history', params);
+      return response;
+    } catch (error) {
+      console.error('TORB history fetch error:', error);
+      throw error;
+    }
+  }
+
+  async getTORBRange(symbol: CurrencyPair = 'USDJPY', date?: string): Promise<any> {
+    try {
+      const backendSymbol = this.convertSymbolToBackend(symbol);
+      const params = new URLSearchParams({ symbol: backendSymbol });
+      if (date) {
+        params.append('date', date);
+      }
+      const response = await this.makeBackendRequest('/torb/range', params);
+      return response;
+    } catch (error) {
+      console.error('TORB range fetch error:', error);
+      throw error;
+    }
+  }
+
+  async getTORBAnalysis(symbol: CurrencyPair = 'USDJPY'): Promise<any> {
+    try {
+      const backendSymbol = this.convertSymbolToBackend(symbol);
+      const params = new URLSearchParams({ symbol: backendSymbol });
+      const response = await this.makeBackendRequest('/torb/analysis', params);
+      return response;
+    } catch (error) {
+      console.error('TORB analysis fetch error:', error);
       throw error;
     }
   }

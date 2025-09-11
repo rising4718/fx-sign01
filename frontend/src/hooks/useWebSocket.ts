@@ -126,22 +126,97 @@ export const useWebSocket = (autoConnect: boolean = true): UseWebSocketReturn =>
     }
   }, []);
 
-  // 初期化・クリーンアップ
+  // 初期化・クリーンアップ（依存関係最適化）
   useEffect(() => {
-    if (autoConnect) {
-      connect().catch((error) => {
-        logger.error('❌ [useWebSocket] Auto-connect failed:', error);
-      });
-    }
+    // React StrictModeでの二重実行を防ぐ
+    if (!autoConnect) return;
 
-    // 定期的な接続状態更新
-    const statusInterval = setInterval(updateConnectionState, 5000);
+    let mounted = true;
+    let statusInterval: NodeJS.Timeout | null = null;
+    let connectionInitialized = false;
+
+    const initConnection = async () => {
+      if (!mounted || connectionInitialized) return;
+      
+      // 接続初期化フラグを立てる
+      connectionInitialized = true;
+
+      try {
+        if (!wsServiceRef.current) {
+          wsServiceRef.current = getWebSocketService();
+        }
+
+        // 既に接続している場合はスキップ
+        if (wsServiceRef.current.isConnected()) {
+          const state = wsServiceRef.current.getConnectionState();
+          setConnectionState(state);
+          
+          // ハンドラーが未登録の場合のみ登録
+          wsServiceRef.current.onMessage('PRICE_UPDATE', handlePriceUpdate);
+          wsServiceRef.current.onMessage('TORB_SIGNAL', handleTORBSignal);
+          return;
+        }
+
+        setConnectionState(prev => ({ ...prev, connecting: true }));
+        
+        await wsServiceRef.current.connect();
+        
+        if (!mounted) return;
+
+        // メッセージハンドラー登録
+        wsServiceRef.current.onMessage('PRICE_UPDATE', handlePriceUpdate);
+        wsServiceRef.current.onMessage('TORB_SIGNAL', handleTORBSignal);
+        
+        // 接続状態更新
+        if (wsServiceRef.current) {
+          const state = wsServiceRef.current.getConnectionState();
+          setConnectionState(state);
+        }
+        
+        logger.info('✅ [useWebSocket] WebSocket connected and handlers registered');
+
+        // 定期的な接続状態更新を開始
+        statusInterval = setInterval(() => {
+          if (mounted && wsServiceRef.current) {
+            const state = wsServiceRef.current.getConnectionState();
+            setConnectionState(state);
+          }
+        }, 5000);
+
+      } catch (error) {
+        if (mounted) {
+          logger.error('❌ [useWebSocket] Auto-connect failed:', error);
+          if (wsServiceRef.current) {
+            const state = wsServiceRef.current.getConnectionState();
+            setConnectionState(state);
+          }
+        }
+        // エラー時は初期化フラグをリセット
+        connectionInitialized = false;
+      }
+    };
+
+    // 少し遅延させて実行（React StrictModeの二重実行対策）
+    const timeoutId = setTimeout(initConnection, 100);
 
     return () => {
-      clearInterval(statusInterval);
-      disconnect();
+      mounted = false;
+      clearTimeout(timeoutId);
+      
+      if (statusInterval) {
+        clearInterval(statusInterval);
+      }
+      
+      // クリーンアップ時はハンドラーのみ削除、接続は維持
+      if (wsServiceRef.current && import.meta.env.MODE !== 'development') {
+        // 本番環境でのみ切断
+        wsServiceRef.current.offMessage('PRICE_UPDATE', handlePriceUpdate);
+        wsServiceRef.current.offMessage('TORB_SIGNAL', handleTORBSignal);
+        wsServiceRef.current.disconnect();
+        logger.info('⏹️ [useWebSocket] WebSocket disconnected in cleanup');
+      }
     };
-  }, [autoConnect, connect, disconnect, updateConnectionState]);
+  }, [autoConnect]); // 依存関係を autoConnect のみに限定
 
   return {
     connectionState,

@@ -38,6 +38,27 @@ FX Pattern Analyzer - USD/JPYデイトレード用の高度なパターン分析
 - **TORB Strategy**: Tokyo Box (9:00-11:00 JST) ブレイクアウト戦略実装
 - **Performance**: フロントエンドキャッシュ + バックエンドDB履歴蓄積の二層構造
 - **Data Sources**: GMO Coin（リアルタイム） + OANDA（バックフィル） + Alpha Vantage（補完）
+- **Authentication**: 開発環境と本番環境で統一された認証システム
+
+### 📊 TORB戦略実装詳細
+
+**コア実装**: `backend/src/services/torbAnalysisService.ts`
+
+**主要フィルター**:
+- **Tokyo Box幅**: 30-55pips（理想範囲）、最大70pips
+- **ATR フィルター**: 70-150pips範囲での市場ボラティリティ検証
+- **RSI フィルター**: 45/55閾値でのトレンド確認
+- **時間フィルター**: 9:00-11:00 JST Tokyo Boxセッション
+
+**セッション別利益比率**:
+- Tokyo Session: 1.5:1 (Risk:Reward)
+- London Session: 2.5:1 
+- New York Session: 2.0:1
+
+**重要修正履歴**:
+- ATR計算ロジック修正（0pips問題解決）
+- Box幅計算の精度向上
+- WebSocket配信システム統合
 
 ## 🚀 デプロイメント
 
@@ -87,6 +108,35 @@ git add . && git commit -m "fix: [エラー内容]" && git push origin main
 - `cd frontend && npm run build` - Vite ビルド
 - `cd frontend && npm test -- --run` - Vitest実行
 
+## 🔐 認証システム（開発・本番統一仕様）
+
+### 基本方針
+- **開発環境と本番環境で同一の認証システム使用**
+- **自動バイパス機能は廃止**し、統一されたJWT認証のみ
+- **ローカル開発時も通常ログイン必須**（ユーザー体験統一）
+
+### 開発環境ログイン
+- **テストユーザー**: `test@example.com` / パスワード: `dev123`
+- **管理者ユーザー**: `admin@example.com` / パスワード: `admin123`
+- **ログイン方法**: フロントエンドログインページから通常ログイン
+
+### 認証機能
+- **JWT Token**: アクセストークン（15分）+ リフレッシュトークン（7日）
+- **自動トークンリフレッシュ**: アクセストークン期限切れ時自動更新
+- **セッション永続化**: localStorage保存でブラウザ再起動後も維持
+- **プラン制限**: free/premium/pro プランによるアクセス制御
+
+### データベース
+- **永続化**: Docker Compose PostgreSQL（volumes設定済み）
+- **テストデータ**: 開発用ユーザーアカウント事前作成済み
+- **マイグレーション**: Prisma による自動DB初期化
+
+### 旧システムからの変更点
+- **削除**: 開発環境自動認証バイパス機能（AuthContext.tsx内）
+- **削除**: `/dev/auth/*` 開発専用API エンドポイント
+- **追加**: 開発用テストアカウントの事前セットアップ
+- **統一**: 開発・本番で同一のログイン体験
+
 ## 🗃️ データベース管理 (Prisma)
 
 ### マイグレーション
@@ -130,6 +180,32 @@ git add . && git commit -m "fix: [エラー内容]" && git push origin main
 - **Backend起動時**: `NODE_ENV=development` 必須
 - **ポート競合チェック**: `lsof -i :3002` `lsof -i :5173`
 - **プロセス確認**: 起動前に既存プロセスを確認すること
+- **WebSocket**: ポート競合時は既存プロセスを`kill -9 [PID]`で終了
+
+### 🔌 WebSocketトラブルシューティング
+
+**よくある問題**:
+- **EADDRINUSE エラー**: 複数バックエンドプロセスによるポート競合
+- **接続失敗**: フロントエンドでのWebSocketエラー表示
+
+**解決手順**:
+```bash
+# 1. ポート使用状況確認
+lsof -i :3002
+
+# 2. 競合プロセス強制終了
+kill -9 [PID]
+
+# 3. バックグラウンドプロセス確認・終了
+# Claude Code使用時のバックグラウンドBashプロセスをKillBashツールで終了
+
+# 4. クリーンな状態でサーバー再起動
+NODE_ENV=development npm run dev
+```
+
+**接続確認**:
+- バックエンドログで `WebSocket client connected:` メッセージを確認
+- フロントエンドコンソールでWebSocketエラーが消失していることを確認
 
 ## 💰 リアルタイム価格更新デバッグ
 
@@ -215,6 +291,6 @@ git add . && git commit -m "fix: [エラー内容]" && git push origin main
 
 ---
 
-**最終更新**: 2025-09-09  
-**プロジェクト**: FX Pattern Analyzer v2.4.0 - Tokyo Box Strategy Implementation
+**最終更新**: 2025-09-11  
+**プロジェクト**: FX Pattern Analyzer v2.4.1 - WebSocket Architecture Enhancement
 - 回答は必ず日本語で

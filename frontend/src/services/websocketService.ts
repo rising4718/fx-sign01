@@ -45,11 +45,15 @@ export class WebSocketService {
     // 環境に応じてWebSocketサーバーURLを設定
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = import.meta.env.MODE === 'development' 
-      ? 'fxbuybuy.site' 
+      ? `${import.meta.env.VITE_BACKEND_HOST || 'localhost'}:${import.meta.env.VITE_WS_PORT || '3002'}` 
       : window.location.host;
-    this.url = `${protocol}//${host}/ws`;
+    this.url = `${protocol}//${host}`;
     
     logger.info(`🔌 [WS Client] Initializing WebSocket connection to ${this.url}`);
+    console.log('🔧 [DEBUG] WebSocket URL:', this.url);
+    console.log('🔧 [DEBUG] Mode:', import.meta.env.MODE);
+    console.log('🔧 [DEBUG] Protocol:', protocol);
+    console.log('🔧 [DEBUG] Host:', host);
   }
 
   /**
@@ -71,10 +75,20 @@ export class WebSocketService {
       this.isConnecting = true;
       logger.info(`🔌 [WS Client] Connecting to ${this.url}...`);
 
+      // 接続タイムアウト設定
+      const connectionTimeout = setTimeout(() => {
+        this.isConnecting = false;
+        if (this.ws) {
+          this.ws.close();
+        }
+        reject(new Error('WebSocket connection timeout'));
+      }, 10000); // 10秒タイムアウト
+
       try {
         this.ws = new WebSocket(this.url);
 
         this.ws.onopen = () => {
+          clearTimeout(connectionTimeout);
           logger.info('✅ [WS Client] Connected successfully');
           this.isConnecting = false;
           this.reconnectAttempts = 0;
@@ -101,9 +115,21 @@ export class WebSocketService {
         };
 
         this.ws.onerror = (error) => {
-          logger.error('❌ [WS Client] Connection error:', error);
-          this.isConnecting = false;
-          reject(error);
+          clearTimeout(connectionTimeout);
+          
+          // 接続完了前のみエラーとして処理
+          if (this.isConnecting) {
+            // React StrictModeの二重実行によるエラーは無視
+            if (import.meta.env.MODE === 'development') {
+              // 開発環境では詳細ログを出さない（二重実行による誤検知を防ぐ）
+              this.isConnecting = false;
+              reject(new Error(`WebSocket connection failed`));
+            } else {
+              logger.error('❌ [WS Client] Connection failed during handshake');
+              this.isConnecting = false;
+              reject(new Error(`WebSocket connection failed: ${error.type}`));
+            }
+          }
         };
 
       } catch (error) {
@@ -121,8 +147,11 @@ export class WebSocketService {
     logger.info('⏹️ [WS Client] Disconnecting...');
     this.stopHeartbeat();
     
-    if (this.ws) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.close(1000, 'Client disconnect');
+      this.ws = null;
+    } else if (this.ws) {
+      // 接続が開いていない場合は単にnullに設定
       this.ws = null;
     }
   }

@@ -14,28 +14,76 @@ USD/JPYデイトレード用の高度なパターン分析ツールで、東京�
 
 ## 📚 ドキュメントハブ
 
-### 🚀 開発・運用関連
-| ドキュメント | 内容 | ステータス |
-|------------|------|----------|
-| [🛠️ 開発ガイド](./DEVELOPMENT_GUIDE.md) | **ローカル開発・認証バイパス・デバッグ手順** | ✅ 最新 |
-| [🚀 デプロイガイド](./DEPLOYMENT_GUIDE.md) | **GitHub Actions自動デプロイ・VPS運用** | ✅ 最新 |
-| [⚡ Claude開発コマンド](./CLAUDE.md) | **Claude Code用コマンドリファレンス** | ✅ 最新 |
-| [📋 デプロイ仕様書](./DEPLOYMENT_SPECIFICATION.md) | デプロイメント技術仕様 | 🔄 要更新 |
+### 🎯 目的別クイックアクセス
 
-### 📖 技術・仕様関連  
+#### 🚀 **開発を始めたい**
+- [🛠️ 統合運用ガイド](./OPERATIONS_GUIDE_UNIFIED.md#開発環境セットアップ) → 開発環境構築
+- [⚡ Claude開発コマンド](./CLAUDE.md) → 開発コマンド一覧
+- [📋 TASK.md](./TASK.md#今週-2025-09-11) → 現在のタスク・次のステップ
+
+#### 🔧 **システムを理解したい**
+- [📖 統合技術仕様書](./TECHNICAL_SPECIFICATION_UNIFIED.md#システムアーキテクチャ) → アーキテクチャ概要
+- [📖 統合技術仕様書](./TECHNICAL_SPECIFICATION_UNIFIED.md#実装済み機能) → 完了機能一覧
+- [📖 統合技術仕様書](./TECHNICAL_SPECIFICATION_UNIFIED.md#torb戦略仕様) → TORB戦略詳細
+
+#### 🚀 **デプロイしたい**
+- [🛠️ 統合運用ガイド](./OPERATIONS_GUIDE_UNIFIED.md#デプロイメント) → GitHub Actions自動デプロイ
+- [⚡ Claude開発コマンド](./CLAUDE.md#🚀-デプロイメント) → デプロイコマンド
+- [🛠️ 統合運用ガイド](./OPERATIONS_GUIDE_UNIFIED.md#トラブルシューティング) → 問題解決
+
+#### 💼 **ビジネス面を知りたい**
+- [💼 統合ビジネスガイド](./BUSINESS_GUIDE_UNIFIED.md#ビジネスモデル) → 収益化戦略
+- [💼 統合ビジネスガイド](./BUSINESS_GUIDE_UNIFIED.md#torb戦略lp) → マーケティング戦略
+- [💼 統合ビジネスガイド](./BUSINESS_GUIDE_UNIFIED.md#法的規制要件) → 法的要件
+
+#### 🔍 **運用・監視したい**
+- [🛠️ 統合運用ガイド](./OPERATIONS_GUIDE_UNIFIED.md#運用監視) → 監視・ヘルスチェック
+- [🛠️ 統合運用ガイド](./OPERATIONS_GUIDE_UNIFIED.md#データベース運用) → DB管理
+- [🛠️ 統合運用ガイド](./OPERATIONS_GUIDE_UNIFIED.md#バックアップ復旧) → バックアップ手順
+
+---
+
+### 📋 全ドキュメント一覧
+
+#### 🚀 開発・運用関連
 | ドキュメント | 内容 | ステータス |
 |------------|------|----------|
-| [📖 技術仕様書](./TECHNICAL_SPECIFICATION_V2.md) | **システム全体の技術詳細** | ✅ 最新 |
-| [📈 TORB戦略詳細](./tokyo_box_strategy_spec.md) | **東京ボックス戦略の完全仕様** | ✅ 最新 |
-| [🔄 API代替戦略](./API_FALLBACK_STRATEGY.md) | API障害時の対応策 | ✅ 最新 |
-| [⚠️ コンプライアンス](./COMPLIANCE_AND_REQUIREMENTS.md) | 法的要件・規制対応 | ✅ 最新 |
+| [🛠️ 統合運用ガイド](./OPERATIONS_GUIDE_UNIFIED.md) | **開発・デプロイ・運用の統合ガイド** | ✅ 最新 |
+| [⚡ Claude開発コマンド](./CLAUDE.md) | **Claude Code用コマンドリファレンス** | ✅ 最新 |
+| [📋 タスク管理](./TASK.md) | **プロジェクト進捗・次期実装計画** | ✅ 最新 |
+
+#### 📖 技術・仕様関連  
+| ドキュメント | 内容 | ステータス |
+|------------|------|----------|
+| [📖 統合技術仕様書](./TECHNICAL_SPECIFICATION_UNIFIED.md) | **システム全体の技術詳細（統合版）** | ✅ 最新 |
+
+#### 💼 ビジネス・マーケティング
+| ドキュメント | 内容 | ステータス |  
+|------------|------|----------|
+| [💼 統合ビジネスガイド](./BUSINESS_GUIDE_UNIFIED.md) | **収益化・マーケティング・法務（統合版）** | ✅ 最新 |
+
+### 📚 アーカイブ（統合前）
+| カテゴリ | ドキュメント | 内容 | ステータス |
+|----------|------------|------|----------|
+| **技術系** | [📖 技術仕様書v2](./docs-archive/TECHNICAL_SPECIFICATION_V2.md) | 旧システム技術詳細 | 🗄️ アーカイブ |
+| | [📈 TORB戦略詳細](./docs-archive/tokyo_box_strategy_spec.md) | 東京ボックス戦略仕様 | 🗄️ アーカイブ |
+| | [🔄 API代替戦略](./docs-archive/API_FALLBACK_STRATEGY.md) | API障害時対応策 | 🗄️ アーカイブ |
+| | [📋 FXツール仕様](./docs-archive/FX_SIGN_TOOL_SPECIFICATION.md) | 初期仕様書 | 🗄️ アーカイブ |
+| **運用系** | [🛠️ 開発ガイド](./docs-archive/DEVELOPMENT_GUIDE.md) | 旧開発手順 | 🗄️ アーカイブ |
+| | [🚀 デプロイガイド](./docs-archive/DEPLOYMENT_GUIDE.md) | 旧デプロイ手順 | 🗄️ アーカイブ |
+| | [📋 デプロイ仕様書](./docs-archive/DEPLOYMENT_SPECIFICATION.md) | 旧デプロイ仕様 | 🗄️ アーカイブ |
+| **ビジネス系** | [💼 ビジネス仕様書](./docs-archive/BUSINESS_PLAN_SPECIFICATION.md) | 旧収益化計画 | 🗄️ アーカイブ |
+| | [📈 TORB戦略LP](./docs-archive/tokyo_box_strategy_lp.md) | 旧マーケティング資料 | 🗄️ アーカイブ |
+| | [⚖️ 法的要件](./docs-archive/COMPLIANCE_AND_REQUIREMENTS.md) | 旧コンプライアンス | 🗄️ アーカイブ |
+| **その他** | [📝 会話ログ](./docs-archive/CONVERSATION_LOG_*.md) | 開発履歴 | 🗄️ アーカイブ |
+| | [🔧 セットアップ](./docs-archive/GITHUB_SETUP.md) | 旧セットアップ手順 | 🗄️ アーカイブ |
+| | [📋 ワークフロー](./docs-archive/GIT_WORKFLOW.md) | 旧Git運用 | 🗄️ アーカイブ |
+| | [📖 ロードマップ](./docs-archive/STRATEGY_ENHANCEMENT_ROADMAP.md) | 旧戦略拡張計画 | 🗄️ アーカイブ |
 
 ### 💼 ビジネス・マーケティング
 | ドキュメント | 内容 | ステータス |  
 |------------|------|----------|
-| [💼 TORB戦略LP](./tokyo_box_strategy_lp.md) | マーケティング・説明資料 | ✅ 最新 |
-| [📊 ビジネス仕様書](./BUSINESS_PLAN_SPECIFICATION.md) | 収益化・会員制度設計 | ✅ 最新 |
-| [🔧 引き継ぎ手順](./HANDOFF_INSTRUCTIONS.md) | 開発者向け引き継ぎ情報 | 🔄 要更新 |
+| [💼 統合ビジネスガイド](./BUSINESS_GUIDE_UNIFIED.md) | **収益化・マーケティング・法務（統合版）** | ✅ 最新 |
 
 ## Phase 1 データ収集システム完了 ✅
 
@@ -95,7 +143,7 @@ USD/JPYデイトレード用の高度なパターン分析ツールで、東京�
 - **フォールバック2**: インテリジェント価格生成システム（緊急時）
 - **更新頻度**: 1秒間隔（リアルタイム価格・チャート同期更新）
 - **自動切り替え**: 3層フォールバック戦略
-- **価格データ**: **🚨 実際の市場価格のみ使用 - モックデータは一切使用禁止**
+- **価格データ**: **🚨 GMOコインFX APIメイン・実価格のみ - モックデータ完全排除**
 - **詳細仕様**: [API_FALLBACK_STRATEGY.md](./API_FALLBACK_STRATEGY.md)
 
 ## プロジェクト構造
@@ -215,7 +263,7 @@ cd /var/www/fx-sign01 && ./deploy.sh
 
 ### フォールバック戦略
 1. **Alpha Vantage API** (1次フォールバック)
-2. **モックデータシステム** (2次フォールバック)
+2. **インテリジェント価格生成システム** (2次フォールバック)
 3. **自動切り替えロジック** (健康状態監視)
 
 詳細は [API_FALLBACK_STRATEGY.md](./API_FALLBACK_STRATEGY.md) を参照

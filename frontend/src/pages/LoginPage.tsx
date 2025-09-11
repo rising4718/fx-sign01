@@ -7,7 +7,6 @@ import AntHeader from '../components/AntHeader';
 
 const { Content } = Layout;
 const { Title, Text, Paragraph } = Typography;
-const { TabPane } = Tabs;
 
 interface LoginFormData {
   email: string;
@@ -92,18 +91,18 @@ const LoginPage: React.FC = () => {
               onChange={setActiveTab}
               centered
               size="large"
-            >
-              {/* ログインタブ */}
-              <TabPane 
-                tab={
-                  <span>
-                    <LoginOutlined />
-                    ログイン
-                  </span>
-                } 
-                key="login"
-              >
-                <Form
+              items={[
+                {
+                  key: 'login',
+                  label: (
+                    <span>
+                      <LoginOutlined />
+                      ログイン
+                    </span>
+                  ),
+                  children: (
+                    <>
+                      <Form
                   name="login"
                   onFinish={handleLogin}
                   layout="vertical"
@@ -161,19 +160,20 @@ const LoginPage: React.FC = () => {
                     </Button>
                   </Text>
                 </div>
-              </TabPane>
-
-              {/* 新規登録タブ */}
-              <TabPane 
-                tab={
-                  <span>
-                    <UserAddOutlined />
-                    新規登録
-                  </span>
-                } 
-                key="register"
-              >
-                <Alert
+                    </>
+                  )
+                },
+                {
+                  key: 'register',
+                  label: (
+                    <span>
+                      <UserAddOutlined />
+                      新規登録
+                    </span>
+                  ),
+                  children: (
+                    <>
+                      <Alert
                   message="無料アカウント作成"
                   description="Phase 1機能すべて無料でご利用いただけます。将来の有料機能リリース時も既存ユーザー様には特別価格をご用意予定です。"
                   type="info"
@@ -274,8 +274,11 @@ const LoginPage: React.FC = () => {
                     </Button>
                   </Text>
                 </div>
-              </TabPane>
-            </Tabs>
+                    </>
+                  )
+                }
+              ]}
+            />
           </Card>
 
           {/* 機能紹介 */}

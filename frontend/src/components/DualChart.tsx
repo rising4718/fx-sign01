@@ -20,6 +20,7 @@ interface DualChartProps {
     high: number;
     low: number;
     width: number;
+    quality?: string;
   };
   signals?: any[];
 }
@@ -186,25 +187,60 @@ const DualChart: React.FC<DualChartProps> = ({
       ctx.stroke();
     }
 
-    // TORBレンジライン描画
+    // TORBレンジライン描画（品質別色分け）
     if (torbRange) {
-      ctx.strokeStyle = '#ffa940';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([5, 5]);
+      // 品質に応じた色設定
+      const getQualityColor = (quality?: string, width?: number) => {
+        if (quality === 'excellent' || (width && width >= 70 && width <= 100)) return '#52c41a'; // 緑: 優秀
+        if (quality === 'good' || (width && width >= 50 && width <= 120)) return '#ffa940';      // オレンジ: 良好
+        if (quality === 'fair' || (width && width >= 30 && width <= 150)) return '#faad14';     // 黄色: 普通
+        if (quality === 'local') return '#722ed1';                                              // 紫: ローカル計算
+        return '#f5222d';                                                                       // 赤: 品質不良
+      };
+
+      const rangeColor = getQualityColor(torbRange.quality, torbRange.width);
+      
+      ctx.strokeStyle = rangeColor;
+      ctx.lineWidth = 3;
+      ctx.setLineDash([8, 4]);
+      
+      // レンジボックス背景（薄い色）
+      const highY = priceToY(torbRange.high);
+      const lowY = priceToY(torbRange.low);
+      
+      ctx.fillStyle = `${rangeColor}15`; // 透明度を追加
+      ctx.fillRect(chartLeft, highY, chartRight - chartLeft, lowY - highY);
       
       // High line
-      const highY = priceToY(torbRange.high);
       ctx.beginPath();
       ctx.moveTo(chartLeft, highY);
       ctx.lineTo(chartRight, highY);
       ctx.stroke();
       
       // Low line
-      const lowY = priceToY(torbRange.low);
       ctx.beginPath();
       ctx.moveTo(chartLeft, lowY);
       ctx.lineTo(chartRight, lowY);
       ctx.stroke();
+      
+      // レンジラベル（右端に表示）
+      ctx.setLineDash([]);
+      ctx.fillStyle = rangeColor;
+      ctx.font = 'bold 11px sans-serif';
+      ctx.textAlign = 'left';
+      
+      // High ラベル
+      ctx.fillText(`H: ${torbRange.high.toFixed(3)}`, chartRight + 5, highY + 4);
+      
+      // Low ラベル  
+      ctx.fillText(`L: ${torbRange.low.toFixed(3)}`, chartRight + 5, lowY + 4);
+      
+      // 中央に品質マーク
+      const centerY = (highY + lowY) / 2;
+      const qualityText = torbRange.quality === 'excellent' ? '★' : 
+                         torbRange.quality === 'good' ? '◆' : 
+                         torbRange.quality === 'local' ? '◈' : '○';
+      ctx.fillText(qualityText, chartRight + 5, centerY + 4);
       
       ctx.setLineDash([]);
     }
@@ -551,9 +587,32 @@ const DualChart: React.FC<DualChartProps> = ({
             </Text>
           )}
           {torbRange && (
-            <Text style={{ color: '#ffa940', fontSize: '12px' }}>
-              TORBレンジ: {torbRange.width.toFixed(1)} pips
-            </Text>
+            <Space size={4}>
+              <Text style={{ 
+                color: torbRange.quality === 'excellent' ? '#52c41a' : 
+                       torbRange.quality === 'good' ? '#ffa940' : 
+                       torbRange.quality === 'local' ? '#722ed1' : '#f5222d', 
+                fontSize: '12px', 
+                fontWeight: 'bold' 
+              }}>
+                TORBレンジ: {torbRange.width.toFixed(1)} pips
+              </Text>
+              {torbRange.quality && (
+                <Tag 
+                  color={
+                    torbRange.quality === 'excellent' ? 'green' : 
+                    torbRange.quality === 'good' ? 'orange' : 
+                    torbRange.quality === 'local' ? 'purple' : 'red'
+                  }
+                  style={{ fontSize: '10px', padding: '0 4px' }}
+                >
+                  {torbRange.quality === 'excellent' ? '優秀' : 
+                   torbRange.quality === 'good' ? '良好' : 
+                   torbRange.quality === 'fair' ? '普通' :
+                   torbRange.quality === 'local' ? 'ローカル' : '要注意'}
+                </Tag>
+              )}
+            </Space>
           )}
         </Space>
       </div>

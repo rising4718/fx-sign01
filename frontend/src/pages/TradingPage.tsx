@@ -37,7 +37,7 @@ const TradingPage: React.FC = () => {
   const [currentPrice, setCurrentPrice] = useState<number>(150.123);
   const [chartData, setChartData] = useState<any[]>([]);
   const [detailChartData, setDetailChartData] = useState<any[]>([]);
-  const [currentRange, setCurrentRange] = useState<{ high: number; low: number; width: number } | null>(null);
+  const [currentRange, setCurrentRange] = useState<{ high: number; low: number; width: number; quality?: string } | null>(null);
   const [activeSignal, setActiveSignal] = useState<any>(null);
   const [signalHistory, setSignalHistory] = useState<any[]>([]);
   const [tradingHistory, setTradingHistory] = useState<any[]>(() => {
@@ -215,8 +215,37 @@ const TradingPage: React.FC = () => {
     };
     
 
-    // TORB範囲計算関数
-    const calculateRange = (data: any[]) => {
+    // TORB API からレンジデータを取得する関数
+    const fetchTORBRange = async () => {
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        const response = await fxApiService.getTORBRange('USDJPY', today);
+        
+        if (response.success && response.data) {
+          const { high, low, width, isValid, quality } = response.data;
+          if (isValid) {
+            setCurrentRange({ 
+              high: Number(high.toFixed(5)), 
+              low: Number(low.toFixed(5)), 
+              width: Number(width.toFixed(1)),
+              quality // レンジ品質情報を追加
+            });
+            console.log(`📊 [TORB API] レンジ取得成功: H=${high} L=${low} (${width} pips) 品質=${quality}`);
+          } else {
+            console.log(`⚠️ [TORB API] 無効なレンジ: ${width} pips (基準外)`);
+          }
+        } else {
+          console.log(`ℹ️ [TORB API] 本日のレンジデータなし`);
+        }
+      } catch (error) {
+        console.error('🚨 [TORB API] レンジ取得エラー:', error);
+        // フォールバック: ローカル計算
+        calculateRangeLocal(data);
+      }
+    };
+
+    // フォールバック用ローカルレンジ計算
+    const calculateRangeLocal = (data: any[]) => {
       const now = new Date();
       const currentHour = now.getHours();
       const currentMinute = now.getMinutes();
@@ -230,22 +259,34 @@ const TradingPage: React.FC = () => {
         currentHour > torbSettings.rangeStartHour && currentHour < torbSettings.rangeEndHour
       );
       
+      if (isInRangeTime && data.length >= 4) {
+        // レンジ形成期間：最高値・最安値を計算
+        const rangeData = data.slice(-4); // 直近1時間分（15分足4本）
+        const high = Math.max(...rangeData.map(d => d.high));
+        const low = Math.min(...rangeData.map(d => d.low));
+        const width = (high - low) * 10000; // pips換算
+        
+        if (width >= torbSettings.minRangeWidth && width <= torbSettings.maxRangeWidth) {
+          setCurrentRange({ 
+            high: Number(high.toFixed(5)), 
+            low: Number(low.toFixed(5)), 
+            width: Number(width.toFixed(1)),
+            quality: 'local' // ローカル計算マーク
+          });
+          console.log(`📊 [Local Calc] フォールバックレンジ: H=${high} L=${low} (${width} pips)`);
+        }
+      }
+    };
+
+    // ブレイクアウト監視とシグナル生成
+    const monitorBreakout = (data: any[]) => {
+      const now = new Date();
+      const currentHour = now.getHours();
+      
       // ブレイクアウト監視時間かチェック
       const isBreakoutTime = currentHour >= torbSettings.rangeEndHour && currentHour < torbSettings.tradingEndHour;
       
-      if (isInRangeTime) {
-        // レンジ形成期間：最高値・最安値を計算
-        const rangeData = data.slice(-4); // 直近1時間分（15分足4本）
-        if (rangeData.length >= 4) {
-          const high = Math.max(...rangeData.map(d => d.high));
-          const low = Math.min(...rangeData.map(d => d.low));
-          const width = (high - low) * 10000; // pips換算
-          
-          if (width >= torbSettings.minRangeWidth && width <= torbSettings.maxRangeWidth) {
-            setCurrentRange({ high, low, width: Number(width.toFixed(1)) });
-          }
-        }
-      } else if (isBreakoutTime && currentRange && !activeSignal) {
+      if (isBreakoutTime && currentRange && !activeSignal) {
         // ブレイクアウト監視：サイン生成
         const currentPriceValue = data[data.length - 1]?.close || currentPrice;
         
@@ -264,6 +305,7 @@ const TradingPage: React.FC = () => {
           
           setActiveSignal(signal);
           autoSaveTradingRecord(signal);
+          console.log('📈 [Breakout] 買いシグナル生成:', signal);
           
         } else if (currentPriceValue < currentRange.low) {
           // 下抜けブレイクアウト → 売りサイン
@@ -280,11 +322,13 @@ const TradingPage: React.FC = () => {
           
           setActiveSignal(signal);
           autoSaveTradingRecord(signal);
+          console.log('📉 [Breakout] 売りシグナル生成:', signal);
         }
       } else if (currentHour >= torbSettings.tradingEndHour) {
         // 取引終了時間：リセット
         setCurrentRange(null);
         setActiveSignal(null);
+        console.log('🔄 [TORB] 取引セッション終了 - レンジとシグナルをリセット');
       }
     };
 
@@ -518,8 +562,9 @@ const TradingPage: React.FC = () => {
               newData.shift();
             }
             
-            // TORB計算を実行
-            calculateRange(newData);
+            // TORB レンジ取得とブレイクアウト監視
+            await fetchTORBRange();
+            monitorBreakout(newData);
             
             return newData;
           } else {
@@ -537,8 +582,9 @@ const TradingPage: React.FC = () => {
             // 現在価格を更新
             setCurrentPrice(newPrice);
             
-            // TORB計算を実行
-            calculateRange(newData);
+            // TORB レンジ取得とブレイクアウト監視
+            await fetchTORBRange();
+            monitorBreakout(newData);
             
             // アクティブシグナルの自動決済チェック
             if (activeSignal) {
@@ -563,8 +609,9 @@ const TradingPage: React.FC = () => {
       setChartData(initialData);
       setCurrentPrice(initialData[initialData.length - 1]?.close || 150.123);
       
-      // 初期TORB計算
-      calculateRange(initialData);
+      // 初期TORB レンジ取得とブレイクアウト監視
+      await fetchTORBRange();
+      monitorBreakout(initialData);
       console.log('🎯 [INITIALIZATION] 初期データ設定完了 - この後はリアルタイム更新のみ');
     };
     
@@ -755,6 +802,39 @@ const TradingPage: React.FC = () => {
       subscribeToSignals('USD/JPY');
     }
   }, [connectionState.connected, subscribeToPrices, subscribeToSignals]);
+
+  // TORB レンジの定期取得 (15分間隔)
+  useEffect(() => {
+    const fetchTORBRangeInterval = async () => {
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        const response = await fxApiService.getTORBRange('USDJPY', today);
+        
+        if (response.success && response.data && response.data.isValid) {
+          const { high, low, width, quality } = response.data;
+          setCurrentRange({ 
+            high: Number(high.toFixed(5)), 
+            low: Number(low.toFixed(5)), 
+            width: Number(width.toFixed(1)),
+            quality 
+          });
+          console.log(`📊 [TORB API定期取得] レンジ更新: H=${high} L=${low} (${width} pips) 品質=${quality}`);
+        } else {
+          console.log(`ℹ️ [TORB API定期取得] 現在利用可能なレンジなし`);
+        }
+      } catch (error) {
+        console.error('🚨 [TORB API定期取得] エラー:', error);
+      }
+    };
+
+    // 即座に一回実行
+    fetchTORBRangeInterval();
+    
+    // 15分間隔で定期実行
+    const interval = setInterval(fetchTORBRangeInterval, 15 * 60 * 1000);
+    
+    return () => clearInterval(interval);
+  }, []);
 
   // キャッシュ統計の定期更新
   useEffect(() => {
