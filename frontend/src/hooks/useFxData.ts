@@ -43,6 +43,8 @@ export const useFxData = (symbol: string = 'USDJPY'): UseFxDataReturn => {
       setCurrentPrice({
         symbol,
         price: 150.123,
+        bid: 150.118,
+        ask: 150.123,
         timestamp: new Date().toISOString(),
         change: 0.045,
         changePercent: 0.03

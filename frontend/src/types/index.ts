@@ -30,6 +30,8 @@ export interface TORBRange {
 export interface MarketData {
   symbol: string;
   price: number;
+  bid: number;
+  ask: number;
   timestamp: string;
   change: number;
   changePercent: number;

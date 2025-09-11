@@ -1,6 +1,7 @@
 import type { FXApiResponse, MarketData, CurrencyPair } from '../types';
 import type { CandlestickData } from 'lightweight-charts';
 import { CURRENCY_PAIRS } from '../constants/currencyPairs';
+import { cacheService } from './cacheService';
 
 // Backend API設定
 const BACKEND_API_BASE_URL = 'http://localhost:3002/api/v1';
@@ -40,9 +41,14 @@ export class FxApiService {
   private static instance: FxApiService;
   private lastUpdateTime: number = 0;
   private cache: Map<string, any> = new Map();
-  private readonly CACHE_DURATION = 1000; // 1秒キャッシュ（Backend側で1秒更新）
+  private readonly CACHE_DURATION = 500; // 🚀 Phase 4: 500ms高速キャッシュ（プロ仕様）
   private websocket: WebSocket | null = null;
   private wsReconnectTimeout: number | null = null;
+  private performanceMetrics = {
+    requestCount: 0,
+    averageLatency: 0,
+    successRate: 100
+  };
 
   private constructor() {}
 
@@ -53,14 +59,37 @@ export class FxApiService {
     return FxApiService.instance;
   }
 
-  // Backend APIへのリクエスト共通処理
+  // 🚀 Phase 4: パフォーマンス監視機能
+  private trackPerformance(startTime: number, success: boolean) {
+    const latency = Date.now() - startTime;
+    this.performanceMetrics.requestCount++;
+    
+    // 移動平均でレイテンシ計算
+    this.performanceMetrics.averageLatency = 
+      (this.performanceMetrics.averageLatency * 0.9) + (latency * 0.1);
+    
+    // 成功率計算
+    if (success) {
+      this.performanceMetrics.successRate = 
+        (this.performanceMetrics.successRate * 0.95) + (100 * 0.05);
+    } else {
+      this.performanceMetrics.successRate = 
+        (this.performanceMetrics.successRate * 0.95) + (0 * 0.05);
+    }
+
+    if (latency > 100) {
+      console.warn(`⚠️ [Phase 4] 高レイテンシ検出: ${latency}ms`);
+    }
+  }
+
+  // Backend APIへのリクエスト共通処理（パフォーマンス最適化）
   private async makeBackendRequest(endpoint: string, params?: URLSearchParams): Promise<BackendApiResponse> {
+    const startTime = Date.now();
+    
     try {
       const url = params ? 
         `${BACKEND_API_BASE_URL}${endpoint}?${params.toString()}` : 
         `${BACKEND_API_BASE_URL}${endpoint}`;
-
-      console.log(`Backend API Request: ${url}`);
 
       const response = await fetch(url, {
         method: 'GET',
@@ -68,13 +97,15 @@ export class FxApiService {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
         },
-        // CORS設定
         mode: 'cors',
       });
 
       if (!response.ok) {
+        this.trackPerformance(startTime, false);
         throw new Error(`Backend API Error: ${response.status} - ${response.statusText}`);
       }
+
+      this.trackPerformance(startTime, true);
 
       const data: BackendApiResponse = await response.json();
       
@@ -91,24 +122,19 @@ export class FxApiService {
     }
   }
 
-  // リアルタイム価格取得（Backend統合）
+  // リアルタイム価格取得（キャッシュ統合版）
   async getCurrentPrice(symbol: CurrencyPair = DEFAULT_SYMBOL): Promise<MarketData> {
-    console.log(`Backend API取得試行中: ${symbol}`);
+    console.log(`💰 [Price API] リアルタイム価格取得開始: ${symbol}`);
     
     try {
-      const cacheKey = `current_${symbol}`;
-      const now = Date.now();
-
-      // キャッシュチェック（1秒キャッシュ）
-      if (this.cache.has(cacheKey)) {
-        const cached = this.cache.get(cacheKey);
-        if (now - cached.timestamp < this.CACHE_DURATION) {
-          console.log('キャッシュからデータを返却');
-          return cached.data;
-        }
+      // 1. 高性能キャッシュから取得試行
+      const cachedData = await cacheService.getCachedCurrentPrice(symbol);
+      if (cachedData) {
+        console.log(`🚀 [Price Cache Hit] キャッシュからデータ返却: ${symbol}`);
+        return cachedData;
       }
 
-      // Backend APIから価格取得
+      // 2. Backend APIから価格取得
       const params = new URLSearchParams({
         symbol: this.convertSymbolToBackend(symbol)
       });
@@ -116,23 +142,18 @@ export class FxApiService {
       const response = await this.makeBackendRequest('/fx/ticker', params);
       const backendPrice: BackendFXPrice = response.data;
       
-      // フロントエンド形式に変換
+      // 3. フロントエンド形式に変換
       const marketData = this.convertBackendPriceToMarketData(backendPrice, symbol);
 
-      // キャッシュに保存
-      this.cache.set(cacheKey, {
-        data: marketData,
-        timestamp: now
-      });
+      // 4. 高性能キャッシュに保存
+      await cacheService.cacheCurrentPrice(symbol, marketData);
 
-      console.log(`Backend APIからデータ取得成功: ${marketData.price} (${backendPrice.source})`);
+      console.log(`✅ [Price API] Backend APIからデータ取得・キャッシュ保存完了: ${marketData.price} (${backendPrice.source})`);
       return marketData;
 
     } catch (error) {
-      console.error('Backend API接続失敗、フォールバック使用:', error);
-      
-      // フォールバック: モックデータを返す
-      return this.getMockCurrentPrice(symbol);
+      console.error('❌ [Price API] GMO Backend API接続失敗:', error);
+      throw new Error(`GMOコインAPIから価格データを取得できませんでした: ${error}`);
     }
   }
 
@@ -142,30 +163,37 @@ export class FxApiService {
     
     // 並列処理で全通貨ペアの価格を取得
     const promises = symbols.map(async (symbol) => {
-      try {
-        const marketData = await this.getCurrentPrice(symbol);
-        results.set(symbol, marketData);
-      } catch (error) {
-        console.error(`Failed to get price for ${symbol}:`, error);
-        // エラーの場合はモックデータを使用
-        const mockData = await this.getMockCurrentPrice(symbol);
-        results.set(symbol, mockData);
-      }
+      const marketData = await this.getCurrentPrice(symbol);
+      results.set(symbol, marketData);
     });
 
     await Promise.all(promises);
     return results;
   }
 
-  // 履歴データ取得（Backend統合）
+  // 履歴データ取得（インテリジェントキャッシュ統合版）
   async getHistoricalData(
     symbol: CurrencyPair = DEFAULT_SYMBOL,
     interval: string = '15m',
     limit: number = 100
   ): Promise<CandlestickData[]> {
+    const timeframe = interval as '5m' | '15m';
+    console.log(`📊 [Candle API] 履歴データ取得開始: ${symbol}, ${timeframe}, limit: ${limit}`);
+    
     try {
-      console.log(`Backend Historical data requested for ${symbol}, interval: ${interval}, limit: ${limit}`);
+      // 1. キャッシュから取得試行
+      const cachedCandles = await cacheService.getCachedCandleData(symbol, timeframe);
       
+      // 2. 差分更新が必要か確認
+      const shouldFetchNew = await cacheService.shouldFetchNewCandles(symbol, timeframe);
+      
+      if (cachedCandles && !shouldFetchNew) {
+        console.log(`🚀 [Candle Cache Hit] キャッシュからデータ返却: ${symbol} ${timeframe} (${cachedCandles.length}本)`);
+        return cachedCandles.slice(-limit); // 指定の本数に制限
+      }
+
+      // 3. Backend APIから履歴データ取得
+      console.log(`🔄 [Candle API] Backend APIから新データ取得: ${symbol} ${timeframe}`);
       const params = new URLSearchParams({
         symbol: this.convertSymbolToBackend(symbol),
         timeframe: interval,
@@ -175,15 +203,38 @@ export class FxApiService {
       const response = await this.makeBackendRequest('/fx/historical', params);
       const backendCandles: BackendCandleData[] = response.data;
       
-      // フロントエンド形式に変換
-      const candlestickData = backendCandles.map(candle => this.convertBackendCandleData(candle));
+      console.log(`🔍 [Candle API] Raw backend data sample:`, backendCandles.slice(0, 3));
       
-      console.log(`Backend Historical data received: ${candlestickData.length} candles`);
+      // 4. フロントエンド形式に変換
+      const candlestickData = backendCandles.map((candle, index) => {
+        const converted = this.convertBackendCandleData(candle);
+        if (index < 3) {
+          const timeValue = typeof converted.time === 'number' ? converted.time : Date.now() / 1000;
+          const displayTime = new Date(timeValue * 1000);
+          console.log(`🔄 [Candle API ${index}] Backend: ${candle.timestamp} → Unix: ${timeValue} → Display: ${displayTime.getHours().toString().padStart(2, '0')}:${displayTime.getMinutes().toString().padStart(2, '0')}`);
+        }
+        return converted;
+      });
+
+      // 5. キャッシュに保存
+      if (candlestickData.length > 0) {
+        await cacheService.cacheCandleData(symbol, timeframe, candlestickData);
+        console.log(`✅ [Candle Cache] データ保存完了: ${symbol} ${timeframe} (${candlestickData.length}本)`);
+      }
+      
+      console.log(`✅ [Candle API] Backend履歴データ取得完了: ${candlestickData.length} candles`);
       return candlestickData;
 
     } catch (error) {
-      console.error('Backend Historical Data Error:', error);
-      return this.generateRealisticMockData(symbol, limit);
+      // エラー時にキャッシュからフォールバック
+      const cachedCandles = await cacheService.getCachedCandleData(symbol, timeframe);
+      if (cachedCandles) {
+        console.warn(`⚠️ [Candle Fallback] APIエラーのためキャッシュデータ使用: ${symbol} ${timeframe}`);
+        return cachedCandles.slice(-limit);
+      }
+      
+      console.error('❌ [Candle API] GMO Backend API履歴データ取得失敗:', error);
+      throw new Error(`GMOコインAPIから履歴データを取得できませんでした: ${error}`);
     }
   }
 
@@ -237,8 +288,8 @@ export class FxApiService {
       };
       
     } catch (error) {
-      console.error('WebSocket接続失敗、ポーリングにフォールバック:', error);
-      this.startPollingFallback(callback);
+      console.error('GMO WebSocket接続失敗:', error);
+      throw new Error(`GMOコインWebSocket接続に失敗しました: ${error}`);
     }
   }
 
@@ -254,22 +305,6 @@ export class FxApiService {
     }, 5000); // 5秒後に再接続
   }
 
-  // ポーリングフォールバック
-  private startPollingFallback(callback: (data: MarketData) => void): void {
-    console.log('ポーリングフォールバック開始（1秒間隔）');
-    
-    const interval = setInterval(async () => {
-      try {
-        const marketData = await this.getCurrentPrice();
-        callback(marketData);
-      } catch (error) {
-        console.error('Polling update error:', error);
-      }
-    }, 1000); // 1秒ごと（Backend更新頻度に合わせる）
-
-    // クリーンアップ用
-    (window as any).__fxApiPollingInterval = interval;
-  }
 
   disconnectRealTimeUpdates(): void {
     // WebSocket切断
@@ -291,6 +326,17 @@ export class FxApiService {
     }
     
     console.log('リアルタイム更新を停止しました');
+  }
+
+  // 🚀 Phase 4: リアルタイムパフォーマンス監視API
+  getRealtimePerformance() {
+    return {
+      ...this.performanceMetrics,
+      timestamp: Date.now(),
+      status: this.performanceMetrics.averageLatency < 100 ? 'excellent' : 
+              this.performanceMetrics.averageLatency < 200 ? 'good' : 
+              this.performanceMetrics.averageLatency < 500 ? 'fair' : 'poor'
+    };
   }
 
   // パフォーマンス関連API
@@ -344,6 +390,8 @@ export class FxApiService {
     return {
       symbol,
       price: Number(backendPrice.ask.toFixed(pairInfo.decimalPlaces)),
+      bid: Number(backendPrice.bid.toFixed(pairInfo.decimalPlaces)),
+      ask: Number(backendPrice.ask.toFixed(pairInfo.decimalPlaces)),
       timestamp: backendPrice.timestamp,
       change: Number(change.toFixed(pairInfo.decimalPlaces)),
       changePercent: Number(changePercent.toFixed(2))
@@ -361,191 +409,6 @@ export class FxApiService {
     };
   }
 
-  // モックデータ生成（フォールバック用）
-  private async getMockCurrentPrice(symbol: CurrencyPair): Promise<MarketData> {
-    const cacheKey = `mock_${symbol}`;
-    const now = Date.now();
-    
-    // 通貨ペア別の基準価格設定
-    const pairInfo = CURRENCY_PAIRS[symbol];
-    let basePrice: number;
-    
-    switch (symbol) {
-      case 'USDJPY':
-        basePrice = 150.0;
-        break;
-      case 'EURUSD':
-        basePrice = 1.0800;
-        break;
-      case 'GBPUSD':
-        basePrice = 1.2600;
-        break;
-      case 'AUDUSD':
-        basePrice = 0.6700;
-        break;
-      default:
-        basePrice = 1.0000;
-    }
-    
-    let trend = 0;
-    
-    // 前回のモックデータがあれば継続的な価格変動を生成
-    if (this.cache.has(cacheKey)) {
-      const cached = this.cache.get(cacheKey);
-      basePrice = cached.data.price;
-      
-      // 時間による価格変動パターン
-      const hour = new Date().getHours();
-      if (hour >= 9 && hour <= 11) {
-        // 東京時間: より活発な動き
-        trend = (Math.random() - 0.5) * 0.003;
-      } else if (hour >= 16 && hour <= 18) {
-        // ロンドン時間: 中程度の動き
-        trend = (Math.random() - 0.5) * 0.002;
-      } else {
-        // その他: 小さな動き
-        trend = (Math.random() - 0.5) * 0.001;
-      }
-    }
-    
-    const volatility = 0.001;
-    const randomChange = trend + (Math.random() - 0.5) * volatility;
-    const newPrice = basePrice + randomChange;
-    
-    // 通貨ペア別の価格制限
-    let limitedPrice: number;
-    switch (symbol) {
-      case 'USDJPY':
-        limitedPrice = Math.max(145.0, Math.min(155.0, newPrice));
-        break;
-      case 'EURUSD':
-        limitedPrice = Math.max(1.0500, Math.min(1.1200, newPrice));
-        break;
-      case 'GBPUSD':
-        limitedPrice = Math.max(1.2000, Math.min(1.3200, newPrice));
-        break;
-      case 'AUDUSD':
-        limitedPrice = Math.max(0.6200, Math.min(0.7200, newPrice));
-        break;
-      default:
-        limitedPrice = newPrice;
-    }
-    
-    const change = limitedPrice - basePrice;
-    const changePercent = (change / basePrice) * 100;
-
-    const marketData: MarketData = {
-      symbol,
-      price: Number(limitedPrice.toFixed(pairInfo.decimalPlaces)),
-      timestamp: new Date().toISOString(),
-      change: Number(change.toFixed(pairInfo.decimalPlaces)),
-      changePercent: Number(changePercent.toFixed(2))
-    };
-
-    // モックデータもキャッシュに保存
-    this.cache.set(cacheKey, {
-      data: marketData,
-      timestamp: now
-    });
-
-    console.log(`フォールバックモックデータ生成: ${marketData.price} (変化: ${change.toFixed(3)})`);
-    return marketData;
-  }
-
-  // リアルなモックデータ生成（フォールバック用）
-  private generateRealisticMockData(symbol: CurrencyPair, count: number): CandlestickData[] {
-    const data: CandlestickData[] = [];
-    const pairInfo = CURRENCY_PAIRS[symbol];
-    
-    // 通貨ペア別の基準価格設定
-    let basePrice: number;
-    switch (symbol) {
-      case 'USDJPY':
-        basePrice = 150.0;
-        break;
-      case 'EURUSD':
-        basePrice = 1.0800;
-        break;
-      case 'GBPUSD':
-        basePrice = 1.2600;
-        break;
-      case 'AUDUSD':
-        basePrice = 0.6700;
-        break;
-      default:
-        basePrice = 1.0000;
-    }
-    
-    const now = new Date();
-    
-    // 通貨ペア別の取引開始時刻設定
-    const sessionTimes = pairInfo.sessionTimes;
-    const currentHour = now.getUTCHours(); // UTC時間を使用
-    
-    let startTime: Date;
-    if (currentHour >= sessionTimes.rangeStartHour) {
-      // 今日のセッション開始時刻から
-      startTime = new Date(now);
-      startTime.setUTCHours(sessionTimes.rangeStartHour, sessionTimes.rangeStartMinute, 0, 0);
-    } else {
-      // 前日のセッション開始時刻から
-      startTime = new Date(now);
-      startTime.setUTCDate(startTime.getUTCDate() - 1);
-      startTime.setUTCHours(sessionTimes.rangeStartHour, sessionTimes.rangeStartMinute, 0, 0);
-    }
-
-    let currentPrice = basePrice;
-    
-    for (let i = 0; i < count; i++) {
-      const time = new Date(startTime.getTime() + i * 15 * 60 * 1000); // 15分間隔
-      
-      // 東京時間（9:00-11:00）での特別な動き
-      const tokyoOffset = 9 * 60 * 60 * 1000; // UTC+9
-      const tokyoHour = new Date(time.getTime() + tokyoOffset).getHours();
-      const tokyoMinute = new Date(time.getTime() + tokyoOffset).getMinutes();
-      
-      let volatility = 0.001; // 基本ボラティリティ
-      let trend = 0;
-      
-      // 東京時間の動きを模擬
-      if (tokyoHour >= 9 && tokyoHour < 11) {
-        volatility *= 1.5; // 東京時間は活発
-        
-        // 9:00-9:45 レンジ形成
-        if (tokyoHour === 9 && tokyoMinute < 45) {
-          volatility *= 0.8; // レンジ内での動き
-          trend = 0;
-        }
-        // 9:45以降 ブレイクアウト可能性
-        else if (tokyoHour === 9 && tokyoMinute >= 45) {
-          if (Math.random() > 0.7) {
-            trend = (Math.random() > 0.5 ? 1 : -1) * 0.002; // ブレイクアウト
-          }
-        }
-      }
-
-      const open = currentPrice;
-      const change = trend + (Math.random() - 0.5) * volatility;
-      const close = open + change;
-      
-      // 高値・安値の計算
-      const range = Math.abs(change) * (1 + Math.random());
-      const high = Math.max(open, close) + range * Math.random() * 0.5;
-      const low = Math.min(open, close) - range * Math.random() * 0.5;
-      
-      data.push({
-        time: Math.floor(time.getTime() / 1000) as any,
-        open: Number(open.toFixed(pairInfo.decimalPlaces)),
-        high: Number(high.toFixed(pairInfo.decimalPlaces)),
-        low: Number(low.toFixed(pairInfo.decimalPlaces)),
-        close: Number(close.toFixed(pairInfo.decimalPlaces)),
-      });
-      
-      currentPrice = close;
-    }
-
-    return data;
-  }
 }
 
 // シングルトンインスタンスのエクスポート

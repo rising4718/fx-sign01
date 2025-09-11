@@ -34,6 +34,8 @@ function AppNoChart() {
         currentPrice={{
           symbol: 'USDJPY',
           price: currentPrice,
+          bid: currentPrice - 0.002,
+          ask: currentPrice,
           change: 0,
           changePercent: 0,
           timestamp: new Date().toISOString()

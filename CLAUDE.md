@@ -1,4 +1,43 @@
-# Claude Code開発コマンド
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## プロジェクト概要
+
+FX Pattern Analyzer - USD/JPYデイトレード用の高度なパターン分析ツールで、Tokyo Opening Range Breakout（TORB）戦略に特化したWebアプリケーション。
+
+### アーキテクチャ構成
+
+- **Backend**: Node.js + Express + TypeScript + Prisma ORM + PostgreSQL + WebSocket
+- **Frontend**: React + TypeScript + Vite + Ant Design + Lightweight Charts
+- **Database**: PostgreSQL（開発：Docker / 本番：Contabo VPS）
+- **External APIs**: GMO Coin WebSocket + OANDA REST API + Alpha Vantage
+- **Deployment**: GitHub Actions + PM2 + Nginx Reverse Proxy
+
+### ディレクトリ構造
+```
+├── backend/          # Node.js Express API server
+│   ├── src/         
+│   │   ├── services/    # fxDataService, historyAccumulationService
+│   │   ├── routes/      # API endpoints + WebSocket handlers
+│   │   ├── models/      # Prisma database models
+│   │   └── server.ts    # Express server entry point
+│   └── prisma/          # Database schema and migrations
+├── frontend/         # React + Vite application  
+│   ├── src/
+│   │   ├── components/  # DualChart, TradingPage
+│   │   ├── hooks/       # useMultiCurrencyData, useWebSocket
+│   │   ├── services/    # fxApi, cacheService, websocketService
+│   │   └── pages/       # Main application pages
+└── database/         # Migration scripts and SQL files
+```
+
+### 重要な技術的特徴
+
+- **Real-time Data**: WebSocket + キャッシュシステムで1秒間隔価格更新
+- **TORB Strategy**: Tokyo Box (9:00-11:00 JST) ブレイクアウト戦略実装
+- **Performance**: フロントエンドキャッシュ + バックエンドDB履歴蓄積の二層構造
+- **Data Sources**: GMO Coin（リアルタイム） + OANDA（バックフィル） + Alpha Vantage（補完）
 
 ## 🚀 デプロイメント
 

@@ -75,6 +75,8 @@ function AppWithMock() {
         currentPrice={{
           symbol: 'USDJPY',
           price: currentPrice,
+          bid: currentPrice - 0.002,
+          ask: currentPrice,
           change: change,
           changePercent: (change / currentPrice) * 100,
           timestamp: new Date().toISOString()

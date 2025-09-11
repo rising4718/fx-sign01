@@ -3,6 +3,7 @@ import type { CandlestickData } from 'lightweight-charts';
 import { type CurrencyPair, CurrencyPairState, MarketData } from '../types';
 import { fxApiService } from '../services/fxApi';
 import { CURRENCY_PAIRS } from '../constants/currencyPairs';
+import { cacheService } from '../services/cacheService';
 
 interface UseMultiCurrencyDataReturn {
   currencyStates: Map<CurrencyPair, CurrencyPairState>;
@@ -59,20 +60,8 @@ export const useMultiCurrencyData = (
 
           return { pair, historicalData };
         } catch (pairError) {
-          console.error(`Failed to fetch data for ${pair}:`, pairError);
-          
-          // エラー時のフォールバック
-          const fallbackState: CurrencyPairState = {
-            pair,
-            currentRange: null,
-            activeSignal: null, 
-            signalStatus: null,
-            rsiValue: null,
-            marketData: null
-          };
-          
-          newStates.set(pair, fallbackState);
-          return { pair, historicalData: [] };
+          console.error(`GMO API failed for ${pair}:`, pairError);
+          throw pairError;
         }
       });
 
@@ -87,7 +76,7 @@ export const useMultiCurrencyData = (
     }
   }, [activePair]);
 
-  // 価格データのリアルタイム更新
+  // 🚀 Phase 4: リアルタイム価格更新（プロ仕様）
   const updateMarketData = useCallback(async () => {
     if (selectedPairs.length === 0) return;
 
@@ -110,10 +99,48 @@ export const useMultiCurrencyData = (
         return updated;
       });
 
+      console.log('💰 [Phase 4] 価格更新完了 - プロ仕様1秒更新');
     } catch (err) {
-      console.error('Failed to update market data:', err);
+      console.error('❌ [Phase 4] 価格更新失敗:', err);
     }
   }, [selectedPairs]);
+
+  // 🎯 Phase 4: 最新ローソク足のリアルタイム更新
+  const updateCurrentCandle = useCallback(async () => {
+    if (!activePair) return;
+
+    try {
+      const currentPrice = await fxApiService.getCurrentPrice(activePair);
+      
+      setChartData(prev => {
+        if (prev.length === 0) return prev;
+        
+        const updated = [...prev];
+        const lastIndex = updated.length - 1;
+        const lastCandle = updated[lastIndex];
+        
+        // 🔥 最新足のOHLC更新（プロ仕様）
+        updated[lastIndex] = {
+          ...lastCandle,
+          close: currentPrice.ask,
+          high: Math.max(lastCandle.high, currentPrice.ask),
+          low: Math.min(lastCandle.low, currentPrice.bid),
+          time: lastCandle.time // 時間は変更しない
+        };
+        
+        return updated;
+      });
+
+      console.log('📈 [Phase 4] 最新ローソク足更新:', {
+        pair: activePair,
+        price: currentPrice.ask,
+        timestamp: new Date().toLocaleTimeString()
+      });
+      
+    } catch (err) {
+      console.error('❌ [Phase 4] ローソク足更新失敗:', err);
+    }
+  }, [activePair]);
 
   // アクティブペアのチャートデータを更新
   const updateActiveChartData = useCallback(async () => {
@@ -158,22 +185,45 @@ export const useMultiCurrencyData = (
     }
   }, [activePair, updateActiveChartData, selectedPairs]);
 
-  // リアルタイム価格更新のポーリング
+  // 🚀 Phase 4: プロ仕様リアルタイム更新システム
   useEffect(() => {
     if (selectedPairs.length === 0) return;
 
-    const interval = setInterval(updateMarketData, 30000); // 30秒ごと
+    console.log('🚀 [Phase 4] プロ仕様リアルタイムシステム開始');
+    
+    // 🔥 最新ローソク足: 1秒間隔更新（プロ仕様）
+    const realtimeInterval = setInterval(updateCurrentCandle, 1000);
+    
+    // 💰 価格データ: 1秒間隔更新
+    const priceInterval = setInterval(updateMarketData, 1000);
+    
+    // 📊 過去ローソク足: 5分間隔更新（効率化）
+    const historicalInterval = setInterval(updateActiveChartData, 300000);
     
     // 初回実行
     updateMarketData();
+    updateCurrentCandle();
 
-    return () => clearInterval(interval);
-  }, [updateMarketData]);
-
-  // Cleanup
-  useEffect(() => {
     return () => {
+      clearInterval(realtimeInterval);
+      clearInterval(priceInterval);
+      clearInterval(historicalInterval);
+      console.log('🧹 [Phase 4] リアルタイムシステム停止');
+    };
+  }, [updateMarketData, updateCurrentCandle, updateActiveChartData, selectedPairs]);
+
+  // キャッシュクリーンアップとリアルタイム更新切断
+  useEffect(() => {
+    // 定期的なキャッシュクリーンアップを開始
+    const cleanupInterval = setInterval(() => {
+      cacheService.cleanupExpiredCache();
+    }, 60000); // 1分ごと
+
+    return () => {
+      // コンポーネントアンマウント時のクリーンアップ
+      clearInterval(cleanupInterval);
       fxApiService.disconnectRealTimeUpdates();
+      console.log('🧹 [Multi Currency Hook] クリーンアップ完了');
     };
   }, []);
 
