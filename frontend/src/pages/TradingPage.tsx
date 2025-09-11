@@ -187,7 +187,7 @@ const TradingPage: React.FC = () => {
     // 🚨 GMOコインAPIのみを使用 - フォールバック処理完全削除
     const fetchInitialDataOnce = async () => {
       console.log('🔄 [GMO ONLY] GMOコインAPIから初期FXデータを取得中...');
-      const candleData = await fxApiService.getHistoricalData('USDJPY', '15m', 20);
+      const candleData = await fxApiService.getHistoricalData('USDJPY', '15m', 15);
       
       console.log('✅ [GMO API] 15分足データを取得しました:', candleData.length + '本');
       console.log('📋 [DEBUG 15分足] Raw candle data sample:', candleData.slice(0, 3));
@@ -621,7 +621,7 @@ const TradingPage: React.FC = () => {
     // 🚨 GMOコインAPIのみを使用 - 5分足データ取得
     const fetch5MinDataOnce = async () => {
       console.log('🔄 [GMO ONLY] GMOコインAPIから5分足データを取得中... (修正版)');
-      const candleData = await fxApiService.getHistoricalData('USDJPY', '5m', 12);
+      const candleData = await fxApiService.getHistoricalData('USDJPY', '5m', 10);
       
       console.log('✅ [GMO API] 5分足データを取得しました:', candleData.length + '本');
       console.log('📋 [DEBUG] Raw candle data sample:', candleData.slice(0, 3));

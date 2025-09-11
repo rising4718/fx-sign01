@@ -28,7 +28,7 @@ export const useFxData = (symbol: string = 'USDJPY'): UseFxDataReturn => {
       setCurrentPrice(price);
 
       // 履歴データを取得
-      const historical = await fxApiService.getHistoricalData(symbol as CurrencyPair, '15m', 100);
+      const historical = await fxApiService.getHistoricalData(symbol as CurrencyPair, '15m', 15);
       setChartData(historical);
       
     } catch (err) {

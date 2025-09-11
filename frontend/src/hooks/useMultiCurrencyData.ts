@@ -38,7 +38,7 @@ export const useMultiCurrencyData = (
       const promises = pairs.map(async (pair) => {
         try {
           const [historicalData, marketData] = await Promise.all([
-            fxApiService.getHistoricalData(pair, '15m', 100),
+            fxApiService.getHistoricalData(pair, '15m', 15),
             fxApiService.getCurrentPrice(pair)
           ]);
 
@@ -145,7 +145,7 @@ export const useMultiCurrencyData = (
   // アクティブペアのチャートデータを更新
   const updateActiveChartData = useCallback(async () => {
     try {
-      const newData = await fxApiService.getHistoricalData(activePair, '15m', 100);
+      const newData = await fxApiService.getHistoricalData(activePair, '15m', 15);
       setChartData(newData);
     } catch (err) {
       console.error('Failed to update chart data:', err);
