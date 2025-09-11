@@ -291,7 +291,7 @@ export class WebSocketService {
    * ハートビート開始
    */
   private startHeartbeat(): void {
-    this.heartbeatInterval = setInterval(() => {
+    this.heartbeatInterval = window.setInterval(() => {
       if (this.isConnected()) {
         this.sendMessage({
           type: 'PING',
@@ -307,7 +307,7 @@ export class WebSocketService {
    */
   private stopHeartbeat(): void {
     if (this.heartbeatInterval) {
-      clearInterval(this.heartbeatInterval);
+      window.clearInterval(this.heartbeatInterval);
       this.heartbeatInterval = null;
     }
   }

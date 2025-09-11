@@ -240,7 +240,8 @@ const TradingPage: React.FC = () => {
       } catch (error) {
         console.error('🚨 [TORB API] レンジ取得エラー:', error);
         // フォールバック: ローカル計算
-        calculateRangeLocal(data);
+        // TORB APIエラー時はローカル計算スキップ（エラー表示のみ）
+        console.warn('⚠️ [TORB API] フォールバック無効 - API修復待ち');
       }
     };
 

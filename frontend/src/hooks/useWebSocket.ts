@@ -132,7 +132,7 @@ export const useWebSocket = (autoConnect: boolean = true): UseWebSocketReturn =>
     if (!autoConnect) return;
 
     let mounted = true;
-    let statusInterval: NodeJS.Timeout | null = null;
+    let statusInterval: number | null = null;
     let connectionInitialized = false;
 
     const initConnection = async () => {
@@ -176,7 +176,7 @@ export const useWebSocket = (autoConnect: boolean = true): UseWebSocketReturn =>
         logger.info('✅ [useWebSocket] WebSocket connected and handlers registered');
 
         // 定期的な接続状態更新を開始
-        statusInterval = setInterval(() => {
+        statusInterval = window.setInterval(() => {
           if (mounted && wsServiceRef.current) {
             const state = wsServiceRef.current.getConnectionState();
             setConnectionState(state);
