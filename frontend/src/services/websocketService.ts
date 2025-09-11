@@ -39,7 +39,7 @@ export class WebSocketService {
   private reconnectDelay = 1000;
   private isConnecting = false;
   private messageHandlers = new Map<string, MessageHandler[]>();
-  private heartbeatInterval: NodeJS.Timeout | null = null;
+  private heartbeatInterval: number | null = null;
 
   constructor() {
     // 環境に応じてWebSocketサーバーURLを設定
