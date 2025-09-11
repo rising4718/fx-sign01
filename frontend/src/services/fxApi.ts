@@ -3,9 +3,13 @@ import type { CandlestickData } from 'lightweight-charts';
 import { CURRENCY_PAIRS } from '../constants/currencyPairs';
 import { cacheService } from './cacheService';
 
-// Backend API設定
-const BACKEND_API_BASE_URL = 'http://localhost:3002/api/v1';
-const BACKEND_WS_URL = 'ws://localhost:3002/ws';
+// Backend API設定（環境判定）
+const BACKEND_API_BASE_URL = (typeof window !== 'undefined' && window.location.hostname === 'fxbuybuy.site') 
+  ? 'https://fxbuybuy.site/api/v1' 
+  : 'http://localhost:3002/api/v1';
+const BACKEND_WS_URL = (typeof window !== 'undefined' && window.location.hostname === 'fxbuybuy.site')
+  ? 'wss://fxbuybuy.site/ws'
+  : 'ws://localhost:3002/ws';
 const DEFAULT_SYMBOL: CurrencyPair = 'USDJPY';
 
 // Backend API レスポンス型

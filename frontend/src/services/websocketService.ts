@@ -45,7 +45,7 @@ export class WebSocketService {
     // 環境に応じてWebSocketサーバーURLを設定
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = import.meta.env.MODE === 'development' 
-      ? 'localhost:3002' 
+      ? 'fxbuybuy.site' 
       : window.location.host;
     this.url = `${protocol}//${host}`;
     
