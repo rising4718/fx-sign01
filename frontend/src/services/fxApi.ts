@@ -9,7 +9,7 @@ const BACKEND_API_BASE_URL = (typeof window !== 'undefined' && window.location.h
   : 'http://localhost:3002/api/v1';
 const BACKEND_WS_URL = (typeof window !== 'undefined' && window.location.hostname === 'fxbuybuy.site')
   ? 'wss://fxbuybuy.site/ws'
-  : 'ws://localhost:3002/ws';
+  : 'ws://localhost:3002';
 const DEFAULT_SYMBOL: CurrencyPair = 'USDJPY';
 
 // Backend API レスポンス型

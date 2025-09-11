@@ -47,7 +47,7 @@ export class WebSocketService {
     const host = import.meta.env.MODE === 'development' 
       ? 'fxbuybuy.site' 
       : window.location.host;
-    this.url = `${protocol}//${host}`;
+    this.url = `${protocol}//${host}/ws`;
     
     logger.info(`🔌 [WS Client] Initializing WebSocket connection to ${this.url}`);
   }

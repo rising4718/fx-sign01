@@ -1121,7 +1121,7 @@ const TradingPage: React.FC = () => {
                 </div>
                 <div>
                   <Text strong>WebSocketサーバー: </Text>
-                  <Text code>{connectionState.url || (window.location.hostname === 'fxbuybuy.site' ? 'wss://fxbuybuy.site' : 'ws://localhost:3002')}</Text>
+                  <Text code>{connectionState.url || (window.location.hostname === 'fxbuybuy.site' ? 'wss://fxbuybuy.site/ws' : 'ws://localhost:3002')}</Text>
                 </div>
                 <div>
                   <Text strong>再接続試行回数: </Text>
