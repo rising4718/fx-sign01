@@ -308,9 +308,9 @@ const DualChart: React.FC<DualChartProps> = ({
       ctx.fillText(price.toFixed(3), chartLeft - 10, y + 4);
     }
 
-    // 時間軸ラベル（全20本を4本間隔で表示、レスポンシブフォント）
+    // 時間軸ラベル（全7本を表示、レスポンシブフォント - 視認性向上）
     ctx.fillStyle = '#ffffff';
-    ctx.font = `${isMobile ? 8 : 10}px Arial`;
+    ctx.font = `${isMobile ? 12 : 12}px Arial`;
     ctx.textAlign = 'center';
     
     // 全7本のローソク足に時間ラベルを表示
@@ -483,9 +483,9 @@ const DualChart: React.FC<DualChartProps> = ({
       ctx.fillText(price.toFixed(3), chartLeft - 5, y + 3);
     }
 
-    // 時間軸ラベル（全7本をすべて表示、レスポンシブフォント）
+    // 時間軸ラベル（全7本をすべて表示、レスポンシブフォント - 視認性向上）
     ctx.fillStyle = '#ffffff';
-    ctx.font = `${isMobile ? 6 : 8}px Arial`;
+    ctx.font = `${isMobile ? 10 : 10}px Arial`;
     ctx.textAlign = 'center';
     
     // 全7本のローソク足に時間ラベルを表示
