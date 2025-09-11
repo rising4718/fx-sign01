@@ -13,7 +13,6 @@ import { torbRoutes } from './routes/torb';
 import { performanceRoutes } from './routes/performance';
 import { autoTradingRoutes } from './routes/autoTrading';
 import authRoutes from './routes/auth';
-import devAuthRoutes from './routes/devAuth';
 import { createHistoryRoutes } from './routes/history';
 import { setupWebSocket } from './services/websocketService';
 import { errorHandler } from './middleware/errorHandler';
@@ -31,7 +30,24 @@ const app = express();
 app.set('trust proxy', 1);
 
 const server = http.createServer(app);
-const wss = new WebSocketServer({ server });
+const wss = new WebSocketServer({ 
+  server,
+  // 開発環境ではOrigin検証を無効化
+  verifyClient: (info) => {
+    if (process.env.NODE_ENV === 'development') {
+      logger.info(`WebSocket connection attempt from: ${info.origin || 'no-origin'}`);
+      return true; // 開発環境では全て許可
+    }
+    
+    // 本番環境でのOrigin検証
+    const origin = info.origin;
+    const allowedOrigins = [
+      process.env.FRONTEND_URL || 'https://fxbuybuy.site'
+    ];
+    
+    return allowedOrigins.includes(origin);
+  }
+});
 
 // PostgreSQL接続設定
 const pool = new Pool({
@@ -108,11 +124,6 @@ app.use('/api/v1/performance', performanceRoutes);
 app.use('/api/v1/auto-trading', autoTradingRoutes);
 app.use('/api/auth', authRoutes);
 
-// Development-only auth routes
-if (process.env.NODE_ENV === 'development') {
-  app.use('/api/dev/auth', devAuthRoutes);
-  logger.info('🔧 Development auth bypass routes enabled');
-}
 
 // Phase2: 履歴データ管理API（静的ルート設定 - 初期化時はnull許可）
 const historyRoutes = createHistoryRoutes(pool, () => historyService);

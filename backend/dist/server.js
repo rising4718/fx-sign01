@@ -11,21 +11,35 @@ const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const cookie_parser_1 = __importDefault(require("cookie-parser"));
 const ws_1 = require("ws");
+const pg_1 = require("pg");
 const fx_1 = require("./routes/fx");
 const torb_1 = require("./routes/torb");
 const performance_1 = require("./routes/performance");
 const autoTrading_1 = require("./routes/autoTrading");
 const auth_1 = __importDefault(require("./routes/auth"));
 const devAuth_1 = __importDefault(require("./routes/devAuth"));
+const history_1 = require("./routes/history");
 const websocketService_1 = require("./services/websocketService");
 const errorHandler_1 = require("./middleware/errorHandler");
 const logger_1 = require("./utils/logger");
+const historyAccumulationService_1 = require("./services/historyAccumulationService");
 const envFile = process.env.NODE_ENV === 'development' ? '.env.development' : '.env';
 dotenv_1.default.config({ path: envFile });
 const app = (0, express_1.default)();
 app.set('trust proxy', 1);
 const server = http_1.default.createServer(app);
 const wss = new ws_1.WebSocketServer({ server });
+const pool = new pg_1.Pool({
+    host: process.env.DATABASE_HOST || 'localhost',
+    port: parseInt(process.env.DATABASE_PORT || '5432'),
+    database: process.env.DATABASE_NAME || 'fx_sign_db',
+    user: process.env.DATABASE_USER || 'fxuser',
+    password: process.env.DATABASE_PASSWORD || 'fxpass123',
+    max: 20,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 2000,
+});
+let historyService = null;
 app.use((0, helmet_1.default)());
 app.use((0, cors_1.default)({
     origin: [
@@ -76,6 +90,8 @@ if (process.env.NODE_ENV === 'development') {
     app.use('/api/dev/auth', devAuth_1.default);
     logger_1.logger.info('🔧 Development auth bypass routes enabled');
 }
+const historyRoutes = (0, history_1.createHistoryRoutes)(pool, () => historyService);
+app.use('/api/v1/history', historyRoutes);
 (0, websocketService_1.setupWebSocket)(wss);
 app.use(errorHandler_1.errorHandler);
 app.use('*', (req, res) => {
@@ -87,14 +103,29 @@ app.use('*', (req, res) => {
 });
 const PORT = parseInt(process.env.PORT || '3001', 10);
 const HOST = process.env.HOST || 'localhost';
-server.listen(PORT, HOST, () => {
+server.listen(PORT, HOST, async () => {
     logger_1.logger.info(`🚀 FX Sign Backend Server started`);
     logger_1.logger.info(`📍 Server running on http://${HOST}:${PORT}`);
     logger_1.logger.info(`🔒 Environment: ${process.env.NODE_ENV || 'development'}`);
     logger_1.logger.info(`🌐 WebSocket Server ready for connections`);
+    try {
+        historyService = new historyAccumulationService_1.HistoryAccumulationService(pool);
+        historyService.start();
+        logger_1.logger.info(`📊 [Phase2] History accumulation service started`);
+    }
+    catch (error) {
+        logger_1.logger.error(`❌ [Phase2] Failed to start history service:`, error);
+    }
 });
 process.on('SIGTERM', () => {
     logger_1.logger.info('SIGTERM received, shutting down gracefully');
+    if (historyService) {
+        historyService.stop();
+        logger_1.logger.info('📊 [Phase2] History accumulation service stopped');
+    }
+    pool.end().then(() => {
+        logger_1.logger.info('🗄️ Database connection pool closed');
+    });
     server.close(() => {
         logger_1.logger.info('HTTP server closed');
         process.exit(0);
@@ -102,6 +133,13 @@ process.on('SIGTERM', () => {
 });
 process.on('SIGINT', () => {
     logger_1.logger.info('SIGINT received, shutting down gracefully');
+    if (historyService) {
+        historyService.stop();
+        logger_1.logger.info('📊 [Phase2] History accumulation service stopped');
+    }
+    pool.end().then(() => {
+        logger_1.logger.info('🗄️ Database connection pool closed');
+    });
     server.close(() => {
         logger_1.logger.info('HTTP server closed');
         process.exit(0);

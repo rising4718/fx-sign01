@@ -73,8 +73,14 @@ class WebSocketService {
       });
     });
 
-    this.wss.on('error', (error) => {
-      logger.error('WebSocket server error:', error);
+    this.wss.on('error', (error: any) => {
+      logger.error('WebSocket server error:', {
+        message: error.message,
+        code: error.code || 'no-code',
+        errno: error.errno || 'no-errno',
+        stack: error.stack,
+        timestamp: new Date().toISOString()
+      });
     });
   }
 

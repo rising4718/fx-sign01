@@ -111,95 +111,90 @@ class FXDataService {
             throw new types_1.APIError(`Alpha Vantage API request failed: ${error.message}`, 'ALPHAVANTAGE_REQUEST_ERROR', error.response?.status || 500, 'alphavantage');
         }
     }
-    generateMockPrice(symbol = 'USD/JPY') {
-        const basePrice = 150.0;
-        const variation = (Math.random() - 0.5) * 0.5;
-        const ask = basePrice + variation;
-        const spread = 0.02 + Math.random() * 0.03;
-        const bid = ask - spread;
-        return {
-            symbol,
-            bid: parseFloat(bid.toFixed(3)),
-            ask: parseFloat(ask.toFixed(3)),
-            spread: parseFloat(spread.toFixed(3)),
-            timestamp: new Date(),
-            source: 'mock'
-        };
-    }
     async getCurrentPrice(symbol = 'USD/JPY') {
         logger_1.logger.debug(`Fetching current price for ${symbol}`);
-        try {
-            const gmoData = await this.fetchFromGMO('/ticker');
-            const usdJpyData = gmoData.data.find((item) => item.symbol === 'USD_JPY');
-            if (usdJpyData) {
-                const priceData = {
-                    symbol: 'USD/JPY',
-                    bid: parseFloat(usdJpyData.bid),
-                    ask: parseFloat(usdJpyData.ask),
-                    spread: parseFloat(usdJpyData.ask) - parseFloat(usdJpyData.bid),
-                    timestamp: new Date(usdJpyData.timestamp),
-                    source: 'gmo'
-                };
-                logger_1.logger.info(`Current price from GMO: ${symbol} - Bid: ${priceData.bid}, Ask: ${priceData.ask}`);
-                return priceData;
-            }
+        const gmoData = await this.fetchFromGMO('/ticker');
+        const usdJpyData = gmoData.data.find((item) => item.symbol === 'USD_JPY');
+        if (!usdJpyData) {
+            throw new types_1.APIError('USD/JPY data not found in GMO API response', 'GMO_DATA_NOT_FOUND', 404, 'gmo');
         }
-        catch (error) {
-            logger_1.logger.warn('GMO API failed, trying Alpha Vantage fallback:', error);
-        }
-        try {
-            const alphaVantageData = await this.fetchFromAlphaVantage({
-                function: 'CURRENCY_EXCHANGE_RATE',
-                from_currency: 'USD',
-                to_currency: 'JPY'
-            });
-            const exchangeRate = alphaVantageData['Realtime Currency Exchange Rate'];
-            if (exchangeRate) {
-                const rate = parseFloat(exchangeRate['5. Exchange Rate']);
-                const bid = parseFloat(exchangeRate['8. Bid Price']);
-                const ask = parseFloat(exchangeRate['9. Ask Price']);
-                const priceData = {
-                    symbol: 'USD/JPY',
-                    bid: bid || rate - 0.02,
-                    ask: ask || rate + 0.02,
-                    spread: ask && bid ? ask - bid : 0.04,
-                    timestamp: new Date(exchangeRate['6. Last Refreshed']),
-                    source: 'alphavantage'
-                };
-                logger_1.logger.info(`Current price from Alpha Vantage: ${symbol} - Bid: ${priceData.bid}, Ask: ${priceData.ask}`);
-                return priceData;
-            }
-        }
-        catch (error) {
-            logger_1.logger.warn('Alpha Vantage API failed, using mock data:', error);
-        }
-        const mockPrice = this.generateMockPrice(symbol);
-        logger_1.logger.info(`Using mock price data: ${symbol} - Bid: ${mockPrice.bid}, Ask: ${mockPrice.ask}`);
-        return mockPrice;
+        const priceData = {
+            symbol: 'USD/JPY',
+            bid: parseFloat(usdJpyData.bid),
+            ask: parseFloat(usdJpyData.ask),
+            spread: parseFloat(usdJpyData.ask) - parseFloat(usdJpyData.bid),
+            timestamp: new Date(usdJpyData.timestamp),
+            source: 'gmo'
+        };
+        logger_1.logger.info(`Current price from GMO: ${symbol} - Bid: ${priceData.bid}, Ask: ${priceData.ask}`);
+        return priceData;
     }
     async getHistoricalData(symbol, timeframe, limit) {
         logger_1.logger.debug(`Fetching historical data for ${symbol}, timeframe: ${timeframe}, limit: ${limit}`);
+        try {
+            const interval = timeframe === '5m' ? '5min' : '15min';
+            const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+            const gmoSymbol = symbol.replace('/', '_');
+            const url = `${this.gmoBaseURL}/klines?symbol=${gmoSymbol}&priceType=BID&interval=${interval}&date=${today}`;
+            logger_1.logger.debug(`Fetching KLine data from GMO: ${url}`);
+            const response = await axios_1.default.get(url);
+            if (response.data && response.data.status === 0 && response.data.data) {
+                const klineData = response.data.data;
+                const limitedData = klineData.slice(-limit);
+                const data = limitedData.map((candle) => ({
+                    timestamp: new Date(parseInt(candle.openTime)),
+                    open: parseFloat(candle.open),
+                    high: parseFloat(candle.high),
+                    low: parseFloat(candle.low),
+                    close: parseFloat(candle.close),
+                    volume: 0
+                }));
+                logger_1.logger.info(`Retrieved ${data.length} historical candles from GMO API`);
+                return data;
+            }
+        }
+        catch (error) {
+            logger_1.logger.error('Error fetching historical data from GMO API:', error);
+        }
+        logger_1.logger.warn('Using fallback data due to API error');
+        const currentPriceData = await this.getCurrentPrice(symbol);
+        const currentPrice = (currentPriceData.bid + currentPriceData.ask) / 2;
+        let price = currentPrice;
         const data = [];
         const now = new Date();
         const intervalMs = timeframe === '5m' ? 5 * 60 * 1000 : 15 * 60 * 1000;
         for (let i = limit - 1; i >= 0; i--) {
             const timestamp = new Date(now.getTime() - (i * intervalMs));
-            const basePrice = 150.0 + (Math.random() - 0.5) * 2;
-            const variation = Math.random() * 0.5;
-            const open = basePrice;
-            const close = basePrice + (Math.random() - 0.5) * 0.3;
-            const high = Math.max(open, close) + Math.random() * 0.2;
-            const low = Math.min(open, close) - Math.random() * 0.2;
-            data.push({
-                timestamp,
-                open: parseFloat(open.toFixed(3)),
-                high: parseFloat(high.toFixed(3)),
-                low: parseFloat(low.toFixed(3)),
-                close: parseFloat(close.toFixed(3)),
-                volume: Math.floor(Math.random() * 1000000)
-            });
+            if (i === 0) {
+                data.push({
+                    timestamp,
+                    open: price,
+                    high: currentPriceData.ask,
+                    low: currentPriceData.bid,
+                    close: currentPrice,
+                    volume: 0
+                });
+            }
+            else {
+                const priceChange = Math.sin(i * 0.1) * 0.2;
+                const open = price;
+                const close = price + priceChange;
+                const highVariation = Math.abs(Math.cos(i * 0.05)) * 0.1;
+                const lowVariation = Math.abs(Math.sin(i * 0.07)) * 0.1;
+                const high = Math.max(open, close) + highVariation;
+                const low = Math.min(open, close) - lowVariation;
+                data.push({
+                    timestamp,
+                    open: parseFloat(open.toFixed(3)),
+                    high: parseFloat(high.toFixed(3)),
+                    low: parseFloat(low.toFixed(3)),
+                    close: parseFloat(close.toFixed(3)),
+                    volume: 0
+                });
+                price = close;
+            }
         }
-        logger_1.logger.info(`Generated ${data.length} historical candles for ${symbol}`);
+        logger_1.logger.info(`Generated ${data.length} historical candles based on GMO current price for ${symbol}`);
         return data;
     }
     async getAPIStatus() {

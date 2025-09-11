@@ -4,7 +4,7 @@ import { CandleData } from '../types';
  * ATR (Average True Range) 計算
  */
 export function calculateATR(candles: CandleData[], period: number = 14): number {
-  if (candles.length < period + 1) {
+  if (candles.length < Math.max(period, 2)) {
     return 0;
   }
 
@@ -25,7 +25,7 @@ export function calculateATR(candles: CandleData[], period: number = 14): number
 
   // ATR = Simple Moving Average of True Ranges
   const recentTR = trueRanges.slice(-period);
-  const atr = recentTR.reduce((sum, tr) => sum + tr, 0) / period;
+  const atr = recentTR.reduce((sum, tr) => sum + tr, 0) / recentTR.length;
   
   return parseFloat(atr.toFixed(5));
 }

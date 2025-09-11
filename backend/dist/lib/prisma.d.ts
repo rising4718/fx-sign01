@@ -1,7 +1,6 @@
 import { PrismaClient } from '@prisma/client';
-declare let prisma: PrismaClient;
 declare global {
     var __prisma: PrismaClient | undefined;
 }
-export { prisma };
+export declare const prisma: PrismaClient<import(".prisma/client").Prisma.PrismaClientOptions, never, import("@prisma/client/runtime/library").DefaultArgs>;
 //# sourceMappingURL=prisma.d.ts.map

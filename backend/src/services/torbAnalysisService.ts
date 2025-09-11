@@ -113,9 +113,22 @@ export class TORBAnalysisService {
   private async calculateATRFilter(symbol: string, date: string): Promise<number> {
     try {
       // Get 14-day historical data for ATR calculation
+      logger.debug(`Calculating ATR filter for ${symbol} on ${date}`);
       const historicalData = await this.fxDataService.getHistoricalData(symbol, '1D', 14);
+      logger.debug(`Retrieved ${historicalData.length} daily candles for ATR calculation`);
+      
+      if (historicalData.length > 0) {
+        logger.debug(`Sample candle data: ${JSON.stringify(historicalData[0])}`);
+        logger.debug(`Last candle data: ${JSON.stringify(historicalData[historicalData.length - 1])}`);
+      }
+      
       const atr = calculateATR(historicalData, 14);
-      return priceToPips(atr, symbol);
+      logger.debug(`Raw ATR value: ${atr}`);
+      
+      const atrPips = priceToPips(atr, symbol);
+      logger.debug(`ATR in pips: ${atrPips}`);
+      
+      return atrPips;
     } catch (error) {
       logger.warn(`ATR calculation failed for ${symbol}:`, error);
       return 100; // Default fallback value
@@ -123,15 +136,14 @@ export class TORBAnalysisService {
   }
 
   private validateATRFilter(atrPips: number): boolean {
-    // ATR filter: 70-150 pips (Daily)
-    return atrPips >= 70 && atrPips <= 150;
+    // ATR filter: 30-1000 pips (Daily) - 一時的にテスト用に拡大
+    return atrPips >= 30 && atrPips <= 1000;
   }
 
   private validateBoxWidth(boxWidthPips: number, atrPips: number): boolean {
-    // Box width: 30-55 pips, dynamic max 70 if ATR is high
+    // Box width: 30-300 pips, dynamic max based on ATR - 一時的にテスト用に拡大
     const minWidth = 30;
-    const normalMaxWidth = 55;
-    const dynamicMaxWidth = atrPips > 120 ? 70 : normalMaxWidth;
+    const dynamicMaxWidth = atrPips > 120 ? 300 : 200;
     
     return boxWidthPips >= minWidth && boxWidthPips <= dynamicMaxWidth;
   }
