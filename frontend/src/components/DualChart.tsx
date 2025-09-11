@@ -13,8 +13,8 @@ interface CandlestickData {
 }
 
 interface DualChartProps {
-  mainData: CandlestickData[];      // 15分足15本
-  detailData: CandlestickData[];    // 5分足10本
+  mainData: CandlestickData[];      // 15分足10本
+  detailData: CandlestickData[];    // 5分足5本
   currentPrice?: number;
   torbRange?: {
     high: number;
@@ -313,7 +313,7 @@ const DualChart: React.FC<DualChartProps> = ({
     ctx.font = `${isMobile ? 8 : 10}px Arial`;
     ctx.textAlign = 'center';
     
-    // 全15本のローソク足に時間ラベルを表示
+    // 全10本のローソク足に時間ラベルを表示
     mainData.forEach((candle, idx) => {
       const x = chartLeft + (idx + 0.5) * candleWidth;
       const time = new Date(typeof candle.time === 'string' ? candle.time : candle.time * 1000);
@@ -330,7 +330,7 @@ const DualChart: React.FC<DualChartProps> = ({
     ctx.fillStyle = '#ffffff';
     ctx.font = `bold ${isMobile ? 14 : 16}px Arial`;
     ctx.textAlign = 'left';
-    ctx.fillText('15分足 (15本)', chartLeft, isMobile ? 20 : 25);
+    ctx.fillText('15分足 (10本)', chartLeft, isMobile ? 20 : 25);
   };
 
   // 5分足詳細チャート描画
@@ -483,12 +483,12 @@ const DualChart: React.FC<DualChartProps> = ({
       ctx.fillText(price.toFixed(3), chartLeft - 5, y + 3);
     }
 
-    // 時間軸ラベル（全10本をすべて表示、レスポンシブフォント）
+    // 時間軸ラベル（全5本をすべて表示、レスポンシブフォント）
     ctx.fillStyle = '#ffffff';
     ctx.font = `${isMobile ? 6 : 8}px Arial`;
     ctx.textAlign = 'center';
     
-    // 全10本のローソク足に時間ラベルを表示
+    // 全5本のローソク足に時間ラベルを表示
     detailData.forEach((candle, idx) => {
       const x = chartLeft + (idx + 0.5) * candleWidth;
       const time = new Date(typeof candle.time === 'string' ? candle.time : candle.time * 1000);
@@ -505,7 +505,7 @@ const DualChart: React.FC<DualChartProps> = ({
     ctx.fillStyle = '#ffffff';
     ctx.font = `bold ${isMobile ? 12 : 14}px Arial`;
     ctx.textAlign = 'left';
-    ctx.fillText('5分足 (10本)', chartLeft, isMobile ? 20 : 25);
+    ctx.fillText('5分足 (5本)', chartLeft, isMobile ? 20 : 25);
   };
 
   useEffect(() => {
