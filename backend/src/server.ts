@@ -6,6 +6,7 @@ import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
 import { WebSocketServer } from 'ws';
+import { Pool } from 'pg';
 
 import { fxRoutes } from './routes/fx';
 import { torbRoutes } from './routes/torb';
@@ -13,9 +14,11 @@ import { performanceRoutes } from './routes/performance';
 import { autoTradingRoutes } from './routes/autoTrading';
 import authRoutes from './routes/auth';
 import devAuthRoutes from './routes/devAuth';
+import { createHistoryRoutes } from './routes/history';
 import { setupWebSocket } from './services/websocketService';
 import { errorHandler } from './middleware/errorHandler';
 import { logger } from './utils/logger';
+import { HistoryAccumulationService } from './services/historyAccumulationService';
 
 // Load environment variables based on NODE_ENV
 const envFile = process.env.NODE_ENV === 'development' ? '.env.development' : '.env';
@@ -29,6 +32,21 @@ app.set('trust proxy', 1);
 
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
+
+// PostgreSQL接続設定
+const pool = new Pool({
+  host: process.env.DATABASE_HOST || 'localhost',
+  port: parseInt(process.env.DATABASE_PORT || '5432'),
+  database: process.env.DATABASE_NAME || 'fx_sign_db',
+  user: process.env.DATABASE_USER || 'fxuser',
+  password: process.env.DATABASE_PASSWORD || 'fxpass123',
+  max: 20, // 最大接続数
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
+});
+
+// Phase2: 履歴データ蓄積サービス初期化
+let historyService: HistoryAccumulationService | null = null;
 
 // Security middleware
 app.use(helmet());
@@ -96,6 +114,10 @@ if (process.env.NODE_ENV === 'development') {
   logger.info('🔧 Development auth bypass routes enabled');
 }
 
+// Phase2: 履歴データ管理API（静的ルート設定 - 初期化時はnull許可）
+const historyRoutes = createHistoryRoutes(pool, () => historyService);
+app.use('/api/v1/history', historyRoutes);
+
 // Setup WebSocket service
 setupWebSocket(wss);
 
@@ -114,16 +136,37 @@ app.use('*', (req, res) => {
 const PORT = parseInt(process.env.PORT || '3001', 10);
 const HOST = process.env.HOST || 'localhost';
 
-server.listen(PORT, HOST, () => {
+server.listen(PORT, HOST, async () => {
   logger.info(`🚀 FX Sign Backend Server started`);
   logger.info(`📍 Server running on http://${HOST}:${PORT}`);
   logger.info(`🔒 Environment: ${process.env.NODE_ENV || 'development'}`);
   logger.info(`🌐 WebSocket Server ready for connections`);
+  
+  // Phase2: 履歴データ蓄積サービス開始
+  try {
+    historyService = new HistoryAccumulationService(pool);
+    historyService.start();
+    logger.info(`📊 [Phase2] History accumulation service started`);
+  } catch (error) {
+    logger.error(`❌ [Phase2] Failed to start history service:`, error);
+  }
 });
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
   logger.info('SIGTERM received, shutting down gracefully');
+  
+  // Phase2: 履歴データ蓄積サービス停止
+  if (historyService) {
+    historyService.stop();
+    logger.info('📊 [Phase2] History accumulation service stopped');
+  }
+  
+  // DB接続プール終了
+  pool.end().then(() => {
+    logger.info('🗄️ Database connection pool closed');
+  });
+  
   server.close(() => {
     logger.info('HTTP server closed');
     process.exit(0);
@@ -132,6 +175,18 @@ process.on('SIGTERM', () => {
 
 process.on('SIGINT', () => {
   logger.info('SIGINT received, shutting down gracefully');
+  
+  // Phase2: 履歴データ蓄積サービス停止
+  if (historyService) {
+    historyService.stop();
+    logger.info('📊 [Phase2] History accumulation service stopped');
+  }
+  
+  // DB接続プール終了
+  pool.end().then(() => {
+    logger.info('🗄️ Database connection pool closed');
+  });
+  
   server.close(() => {
     logger.info('HTTP server closed');
     process.exit(0);

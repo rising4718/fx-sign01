@@ -5,7 +5,7 @@ export interface FXPrice {
   ask: number;
   spread: number;
   timestamp: Date;
-  source: 'gmo' | 'alphavantage' | 'mock';
+  source: 'gmo' | 'alphavantage' | 'mock' | 'intelligent-generation';
 }
 
 export interface CandleData {

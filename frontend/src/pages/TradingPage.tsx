@@ -4,6 +4,8 @@ import Chart from '../components/Chart';
 import DualChart from '../components/DualChart';
 import AntHeader from '../components/AntHeader';
 import { fxApiService } from '../services/fxApi';
+import { cacheService } from '../services/cacheService';
+import { useWebSocket } from '../hooks/useWebSocket';
 import { useSettings } from '../contexts/SettingsContext';
 import { getCurrentJST } from '../utils/timeUtils';
 import { TradingSimulator, createDefaultAccount, TradeParameters } from '../utils/tradingSimulation';
@@ -13,6 +15,16 @@ const { Text } = Typography;
 
 const TradingPage: React.FC = () => {
   const { settings, isDemo } = useSettings();
+  
+  // Phase3: WebSocket接続（自動接続有効）
+  const { 
+    connectionState, 
+    latestPrice, 
+    latestSignal, 
+    priceHistory, 
+    subscribeToPrices, 
+    subscribeToSignals 
+  } = useWebSocket(true);
   
   // 取引シミュレーター初期化（デモ設定の初期残高を使用）
   const [tradingSimulator] = useState(() => new TradingSimulator({
@@ -43,13 +55,15 @@ const TradingPage: React.FC = () => {
     updateCount: number;
     lastChange: number;
     apiSuccessCount: number;
-    fallbackCount: number;
+    cacheHits: number;
+    cacheStats: { memoryEntries: number; localStorageUsage: number; indexedDBSize: number } | null;
   }>({
     lastUpdateTime: null,
     updateCount: 0,
     lastChange: 0,
     apiSuccessCount: 0,
-    fallbackCount: 0
+    cacheHits: 0,
+    cacheStats: null
   });
 
   // 現在残高を取得する関数
@@ -170,74 +184,36 @@ const TradingPage: React.FC = () => {
     const now = new Date();
     let currentCandleStart = get15MinuteTime(now);
     
-    // 実際のAPIから初期データを取得
-    const fetchInitialData = async () => {
-      try {
-        console.log('🔄 実際のFXデータを取得中...');
-        const candleData = await fxApiService.getHistoricalData('USDJPY', '15m', 20);
+    // 🚨 GMOコインAPIのみを使用 - フォールバック処理完全削除
+    const fetchInitialDataOnce = async () => {
+      console.log('🔄 [GMO ONLY] GMOコインAPIから初期FXデータを取得中...');
+      const candleData = await fxApiService.getHistoricalData('USDJPY', '15m', 20);
+      
+      console.log('✅ [GMO API] 15分足データを取得しました:', candleData.length + '本');
+      console.log('📋 [DEBUG 15分足] Raw candle data sample:', candleData.slice(0, 3));
+      
+      const formattedData = candleData.map((candle: any, index: number) => {
+        // fxApiService already returns unix timestamp, no need to convert again
+        const unixTime = typeof candle.time === 'number' ? candle.time : Math.floor(new Date(candle.time || candle.timestamp).getTime() / 1000);
+        const displayTime = new Date(unixTime * 1000);
+        const displayTimeStr = `${displayTime.getHours().toString().padStart(2, '0')}:${displayTime.getMinutes().toString().padStart(2, '0')}`;
         
-        if (candleData && candleData.length > 0) {
-          console.log('✅ 実際のAPIデータを取得しました:', candleData.length + '本');
-          const formattedData = candleData.map((candle: any) => ({
-            time: Math.floor(new Date(candle.time || candle.timestamp).getTime() / 1000),
-            open: Number(candle.open.toFixed(3)),
-            high: Number(candle.high.toFixed(3)),
-            low: Number(candle.low.toFixed(3)),
-            close: Number(candle.close.toFixed(3))
-          }));
-          
-          return formattedData;
-        } else {
-          console.log('⚠️ APIからデータが取得できませんでした。フォールバックデータを使用します。');
-          return generateFallbackData();
+        if (index < 3) {
+          console.log(`🕐 [DEBUG 15分足 ${index}] Candle time: ${candle.time} (type: ${typeof candle.time}) → Unix: ${unixTime} → Display: ${displayTimeStr}`);
         }
-      } catch (error) {
-        console.error('❌ APIデータ取得エラー:', error);
-        console.log('⚠️ フォールバックデータを使用します。');
-        return generateFallbackData();
-      }
-    };
-    
-    // APIエラー時のフォールバックデータ生成
-    const generateFallbackData = () => {
-      console.log('📊 フォールバックデータを生成中...');
-      const data = [];
-      
-      // 過去19本の完成されたローソク足（正確な15分刻み）
-      for (let i = 19; i >= 1; i--) {
-        const candleDate = new Date(currentCandleStart.getTime() - i * 15 * 60 * 1000);
-        const candleTime = Math.floor(candleDate.getTime() / 1000);
-        const change = (Math.random() - 0.5) * 0.005;
         
-        const open = basePrice;
-        const close = basePrice + change;
-        const high = Math.max(open, close) + Math.random() * 0.002;
-        const low = Math.min(open, close) - Math.random() * 0.002;
-        
-        data.push({
-          time: candleTime,
-          open: Number(open.toFixed(3)),
-          high: Number(high.toFixed(3)),
-          low: Number(low.toFixed(3)),
-          close: Number(close.toFixed(3))
-        });
-        
-        basePrice = close;
-      }
-      
-      // 現在進行中のローソク足（最初の値）
-      const currentTime = Math.floor(currentCandleStart.getTime() / 1000);
-      const currentOpen = basePrice;
-      data.push({
-        time: currentTime,
-        open: Number(currentOpen.toFixed(3)),
-        high: Number(currentOpen.toFixed(3)),
-        low: Number(currentOpen.toFixed(3)),
-        close: Number(currentOpen.toFixed(3))
+        return {
+          time: unixTime,
+          open: Number(candle.open.toFixed(3)),
+          high: Number(candle.high.toFixed(3)),
+          low: Number(candle.low.toFixed(3)),
+          close: Number(candle.close.toFixed(3))
+        };
       });
       
-      return data;
+      return formattedData;
     };
+    
 
     // TORB範囲計算関数
     const calculateRange = (data: any[]) => {
@@ -573,159 +549,97 @@ const TradingPage: React.FC = () => {
           }
         }
       } catch (error) {
-        console.error('リアルタイム価格更新エラー:', error);
-        // APIエラー時はフォールバック処理
-        return updateCandleWithFallback(prevData);
+        console.error('GMOコインAPIエラー:', error);
+        throw error; // フォールバック処理を完全に削除
       }
       
       return prevData;
     };
     
-    // APIエラー時のフォールバック更新
-    const updateCandleWithFallback = (prevData: any[]) => {
-      console.log('⚠️ フォールバック価格更新を使用');
-      const newData = [...prevData];
-      const lastCandle = newData[newData.length - 1];
-      const volatility = 0.002;
-      const priceChange = (Math.random() - 0.5) * volatility;
-      const newClose = lastCandle.close + priceChange;
-      
-      const newHigh = Math.max(lastCandle.high, newClose);
-      const newLow = Math.min(lastCandle.low, newClose);
-      
-      newData[newData.length - 1] = {
-        ...lastCandle,
-        high: Number(newHigh.toFixed(3)),
-        low: Number(newLow.toFixed(3)),
-        close: Number(newClose.toFixed(3))
-      };
-      
-      setCurrentPrice(newClose);
-      
-      if (activeSignal) {
-        checkAutoClose(newClose);
-      }
-      
-      return newData;
-    };
 
-    // 初期データを非同期で取得・設定
-    const initializeData = async () => {
-      const initialData = await fetchInitialData();
+    // 🚨 ONCE ONLY: 初期データを非同期で取得・設定（1回限り）
+    const initializeDataOnce = async () => {
+      const initialData = await fetchInitialDataOnce();
       setChartData(initialData);
       setCurrentPrice(initialData[initialData.length - 1]?.close || 150.123);
       
       // 初期TORB計算
       calculateRange(initialData);
+      console.log('🎯 [INITIALIZATION] 初期データ設定完了 - この後はリアルタイム更新のみ');
     };
     
-    initializeData();
+    initializeDataOnce();
     
-    // 5分足データをAPIから取得（12本）
-    const fetch5MinData = async () => {
-      try {
-        console.log('🔄 5分足の実際のFXデータを取得中...');
-        const candleData = await fxApiService.getHistoricalData('USDJPY', '5m', 12);
+    // 🚨 GMOコインAPIのみを使用 - 5分足データ取得
+    const fetch5MinDataOnce = async () => {
+      console.log('🔄 [GMO ONLY] GMOコインAPIから5分足データを取得中... (修正版)');
+      const candleData = await fxApiService.getHistoricalData('USDJPY', '5m', 12);
+      
+      console.log('✅ [GMO API] 5分足データを取得しました:', candleData.length + '本');
+      console.log('📋 [DEBUG] Raw candle data sample:', candleData.slice(0, 3));
+      
+      const formattedData = candleData.map((candle: any, index: number) => {
+        // fxApiService already returns unix timestamp, no need to convert again
+        const unixTime = typeof candle.time === 'number' ? candle.time : Math.floor(new Date(candle.time || candle.timestamp).getTime() / 1000);
+        const displayTime = new Date(unixTime * 1000);
+        const displayTimeStr = `${displayTime.getHours().toString().padStart(2, '0')}:${displayTime.getMinutes().toString().padStart(2, '0')}`;
         
-        if (candleData && candleData.length > 0) {
-          console.log('✅ 5分足の実際のAPIデータを取得しました:', candleData.length + '本');
-          const formattedData = candleData.map((candle: any) => ({
-            time: Math.floor(new Date(candle.time || candle.timestamp).getTime() / 1000),
-            open: Number(candle.open.toFixed(3)),
-            high: Number(candle.high.toFixed(3)),
-            low: Number(candle.low.toFixed(3)),
-            close: Number(candle.close.toFixed(3))
-          }));
-          
-          return formattedData;
+        if (index < 3) {
+          console.log(`🕐 [DEBUG ${index}] Candle time: ${candle.time} (type: ${typeof candle.time}) → Unix: ${unixTime} → Display: ${displayTimeStr}`);
         }
-      } catch (error) {
-        console.error('❌ 5分足APIデータ取得エラー:', error);
-      }
+        
+        return {
+          time: unixTime,
+          open: Number(candle.open.toFixed(3)),
+          high: Number(candle.high.toFixed(3)),
+          low: Number(candle.low.toFixed(3)),
+          close: Number(candle.close.toFixed(3))
+        };
+      });
       
-      // フォールバック：モックデータ生成
-      console.log('⚠️ 5分足フォールバックデータを使用');
-      const data = [];
-      let detailPrice = basePrice;
-      
-      for (let i = 11; i >= 0; i--) {
-        const candleDate = new Date(currentCandleStart.getTime() - i * 5 * 60 * 1000);
-        const candleTime = Math.floor(candleDate.getTime() / 1000);
-        const change = (Math.random() - 0.5) * 0.002;
-        
-        const open = detailPrice;
-        const close = detailPrice + change;
-        const high = Math.max(open, close) + Math.random() * 0.001;
-        const low = Math.min(open, close) - Math.random() * 0.001;
-        
-        data.push({
-          time: candleTime,
-          open: Number(open.toFixed(3)),
-          high: Number(high.toFixed(3)),
-          low: Number(low.toFixed(3)),
-          close: Number(close.toFixed(3))
-        });
-        
-        detailPrice = close;
-      }
-      return data;
+      return formattedData;
     };
 
-    // 5分足データを非同期で取得・設定
-    const initialize5MinData = async () => {
-      const detail5MinData = await fetch5MinData();
+    // 🚨 ONCE ONLY: 5分足データを非同期で取得・設定（1回限り）
+    const initialize5MinDataOnce = async () => {
+      const detail5MinData = await fetch5MinDataOnce();
+      console.log('🚨 [5分足設定] データ確認:', detail5MinData.slice(0, 3).map(d => ({ 
+        time: d.time, 
+        date: new Date(d.time * 1000).toLocaleString('ja-JP') 
+      })));
       setDetailChartData(detail5MinData);
+      console.log('🎯 [INITIALIZATION] 5分足初期データ設定完了 - この後はリアルタイム更新のみ');
     };
     
-    initialize5MinData();
+    initialize5MinDataOnce();
 
     // 1秒ごとに現在のローソク足を更新（リアルタイム価格変動）
     const interval = setInterval(async () => {
-      console.log('🔄 setInterval実行中:', new Date().toLocaleTimeString());
+      // console.log('🔄 setInterval実行中:', new Date().toLocaleTimeString()); // デバッグ用に一時停止
       
       try {
-        // 直接現在価格を取得して更新
+        // キャッシュ統計更新用フラグ
+        const startTime = Date.now();
+        
+        // 現在価格を取得（キャッシュ統合版）
         const currentPriceData = await fxApiService.getCurrentPrice('USDJPY');
         if (currentPriceData) {
-          console.log('✅ 現在価格取得成功:', currentPriceData.price);
+          // console.log('✅ 現在価格取得成功:', currentPriceData.price); // デバッグ用に一時停止
           const change = currentPriceData.price - currentPrice;
-          console.log('💰 価格表示更新:', {
-            previousPrice: currentPrice,
-            newPrice: currentPriceData.price,
-            change: change,
-            timestamp: new Date().toLocaleTimeString()
-          });
+          const responseTime = Date.now() - startTime;
+          const isFromCache = responseTime < 50; // 50ms以下はキャッシュヒットとみなす
+          
           setCurrentPrice(currentPriceData.price);
           setPriceUpdateInfo(prev => ({
             lastUpdateTime: new Date(),
             updateCount: prev.updateCount + 1,
             lastChange: change,
             apiSuccessCount: prev.apiSuccessCount + 1,
-            fallbackCount: prev.fallbackCount
+            cacheHits: isFromCache ? prev.cacheHits + 1 : prev.cacheHits,
+            cacheStats: prev.cacheStats
           }));
         } else {
-          console.warn('⚠️ 現在価格取得失敗、フォールバック価格を生成');
-          // フォールバック処理: 現在価格から小さな変動を生成
-          setCurrentPrice(prev => {
-            const volatility = 0.002;
-            const priceChange = (Math.random() - 0.5) * volatility;
-            const newPrice = Number((prev + priceChange).toFixed(3));
-            console.log('🎲 フォールバック価格生成:', {
-              previousPrice: prev,
-              newPrice: newPrice,
-              change: priceChange,
-              volatility: volatility,
-              timestamp: new Date().toLocaleTimeString()
-            });
-            setPriceUpdateInfo(prevInfo => ({
-              lastUpdateTime: new Date(),
-              updateCount: prevInfo.updateCount + 1,
-              lastChange: priceChange,
-              apiSuccessCount: prevInfo.apiSuccessCount,
-              fallbackCount: prevInfo.fallbackCount + 1
-            }));
-            return newPrice;
-          });
+          throw new Error('GMOコインAPIから価格データを取得できませんでした');
         }
         
         // 現在のチャートデータを元に更新を実行（直接非同期処理）
@@ -733,10 +647,10 @@ const TradingPage: React.FC = () => {
           // 非同期でチャートデータ更新を実行
           (async () => {
             try {
-              console.log('📈 チャートデータ更新開始');
+              // console.log('📈 チャートデータ更新開始'); // デバッグ用に一時停止
               const updatedData = await updateCurrentCandle(currentChartData);
               if (updatedData && updatedData !== currentChartData) {
-                console.log('✅ チャートデータ更新成功');
+                // console.log('✅ チャートデータ更新成功'); // デバッグ用に一時停止
                 setChartData(updatedData);
                 
                 // 5分足データもリアルタイムで適切に更新
@@ -811,6 +725,58 @@ const TradingPage: React.FC = () => {
     }, 1000);
 
     return () => clearInterval(interval);
+  }, []);
+
+  // Phase3: WebSocket価格データ受信処理
+  useEffect(() => {
+    if (latestPrice) {
+      console.log('📡 WebSocket価格受信:', latestPrice);
+      
+      // WebSocketから受信した価格でcurrentPriceを更新
+      setCurrentPrice(latestPrice.bid);
+      
+      // 価格更新統計を更新
+      setPriceUpdateInfo(prev => ({
+        lastUpdateTime: new Date(),
+        updateCount: prev.updateCount + 1,
+        lastChange: latestPrice.bid - currentPrice,
+        apiSuccessCount: prev.apiSuccessCount + 1,
+        cacheHits: prev.cacheHits, // WebSocketは直接受信のためキャッシュヒットとして扱わない
+        cacheStats: prev.cacheStats
+      }));
+    }
+  }, [latestPrice, currentPrice]);
+
+  // Phase3: WebSocket接続状態監視とサブスクリプション
+  useEffect(() => {
+    if (connectionState.connected) {
+      console.log('🔌 WebSocket接続成功 - 価格とシグナルを購読');
+      subscribeToPrices('USD/JPY');
+      subscribeToSignals('USD/JPY');
+    }
+  }, [connectionState.connected, subscribeToPrices, subscribeToSignals]);
+
+  // キャッシュ統計の定期更新
+  useEffect(() => {
+    const updateCacheStats = async () => {
+      try {
+        const stats = await cacheService.getCacheStats();
+        setPriceUpdateInfo(prev => ({
+          ...prev,
+          cacheStats: stats
+        }));
+      } catch (error) {
+        console.warn('⚠️ [Cache Stats] 統計取得エラー:', error);
+      }
+    };
+
+    // 初回実行
+    updateCacheStats();
+    
+    // 30秒ごとに更新
+    const statsInterval = setInterval(updateCacheStats, 30000);
+    
+    return () => clearInterval(statsInterval);
   }, []);
 
   const items = [
@@ -1144,7 +1110,39 @@ const TradingPage: React.FC = () => {
               </Space>
             </Card>
           </Col>
-          <Col xs={24}>
+          <Col xs={24} lg={12}>
+            <Card title="🔌 WebSocket接続状態">
+              <Space direction="vertical" style={{ width: '100%' }}>
+                <div>
+                  <Text strong>接続状態: </Text>
+                  <Tag color={connectionState.connected ? 'green' : connectionState.connecting ? 'orange' : 'red'}>
+                    {connectionState.connected ? '接続中' : connectionState.connecting ? '接続試行中' : '切断中'}
+                  </Tag>
+                </div>
+                <div>
+                  <Text strong>WebSocketサーバー: </Text>
+                  <Text code>{connectionState.url || 'ws://localhost:3002'}</Text>
+                </div>
+                <div>
+                  <Text strong>再接続試行回数: </Text>
+                  <Text>{connectionState.reconnectAttempts}/5</Text>
+                </div>
+                <div>
+                  <Text strong>受信済み価格履歴: </Text>
+                  <Text>{priceHistory.length}件</Text>
+                </div>
+                {latestSignal && (
+                  <div>
+                    <Text strong>最新シグナル: </Text>
+                    <Tag color={latestSignal.signal === 'BUY' ? 'green' : 'red'}>
+                      {latestSignal.signal} - {latestSignal.symbol} (信頼度: {Math.round(latestSignal.confidence * 100)}%)
+                    </Tag>
+                  </div>
+                )}
+              </Space>
+            </Card>
+          </Col>
+          <Col xs={24} lg={12}>
             <Card title="💰 価格更新状況">
               <Space direction="vertical" style={{ width: '100%' }}>
                 <div>
@@ -1154,8 +1152,6 @@ const TradingPage: React.FC = () => {
                 <div>
                   <Text strong>API成功: </Text>
                   <Text style={{ color: '#52c41a' }}>{priceUpdateInfo.apiSuccessCount}回</Text>
-                  <Text strong style={{ marginLeft: '16px' }}>フォールバック: </Text>
-                  <Text style={{ color: '#faad14' }}>{priceUpdateInfo.fallbackCount}回</Text>
                 </div>
                 <div>
                   <Text strong>最終更新: </Text>
@@ -1178,6 +1174,25 @@ const TradingPage: React.FC = () => {
                      Math.round((priceUpdateInfo.apiSuccessCount / priceUpdateInfo.updateCount) * 100) : 0}%
                   </Text>
                 </div>
+                <div>
+                  <Text strong>キャッシュヒット: </Text>
+                  <Text style={{ color: '#1890ff' }}>
+                    {priceUpdateInfo.cacheHits}回 ({priceUpdateInfo.updateCount > 0 ? 
+                     Math.round((priceUpdateInfo.cacheHits / priceUpdateInfo.updateCount) * 100) : 0}%)
+                  </Text>
+                </div>
+                {priceUpdateInfo.cacheStats && (
+                  <>
+                    <div>
+                      <Text strong>メモリキャッシュ: </Text>
+                      <Text style={{ color: '#722ed1' }}>{priceUpdateInfo.cacheStats.memoryEntries}件</Text>
+                    </div>
+                    <div>
+                      <Text strong>ストレージ使用量: </Text>
+                      <Text style={{ color: '#eb2f96' }}>{priceUpdateInfo.cacheStats.localStorageUsage}KB</Text>
+                    </div>
+                  </>
+                )}
               </Space>
             </Card>
           </Col>

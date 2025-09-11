@@ -51,14 +51,22 @@ const DualChart: React.FC<DualChartProps> = ({
     
     if (mainChartRef.current && window.ResizeObserver) {
       mainObserver = new ResizeObserver(() => {
-        setTimeout(() => drawMainChart(), 100); // 少し遅延させて描画
+        setTimeout(() => {
+          if (mainData.length > 0) {
+            drawMainChart();
+          }
+        }, 100); // 少し遅延させて描画（データがある場合のみ）
       });
       mainObserver.observe(mainChartRef.current);
     }
     
     if (detailChartRef.current && window.ResizeObserver) {
       detailObserver = new ResizeObserver(() => {
-        setTimeout(() => drawDetailChart(), 100);
+        setTimeout(() => {
+          if (detailData.length > 0) {
+            drawDetailChart();
+          }
+        }, 100);
       });
       detailObserver.observe(detailChartRef.current);
     }
@@ -72,31 +80,71 @@ const DualChart: React.FC<DualChartProps> = ({
 
   // 15分足メインチャート描画
   const drawMainChart = () => {
-    if (!mainChartRef.current || mainData.length === 0) return;
+    console.log('🎨 [DualChart] drawMainChart called', {
+      hasRef: !!mainChartRef.current,
+      dataLength: mainData.length,
+      timestamp: new Date().toISOString()
+    });
     
-    const canvas = document.createElement('canvas');
+    if (!mainChartRef.current || mainData.length === 0) {
+      console.warn('❌ [DualChart] Cannot draw chart', {
+        hasRef: !!mainChartRef.current,
+        dataLength: mainData.length
+      });
+      return;
+    }
+    
+    // 既存のcanvasを再利用または新規作成
+    let canvas = mainChartRef.current.querySelector('canvas') as HTMLCanvasElement;
+    const canvasExists = !!canvas;
+    
+    if (!canvas) {
+      console.log('📦 [DualChart] Creating new main canvas');
+      canvas = document.createElement('canvas');
+      canvas.style.background = '#1e1e1e';
+      canvas.style.borderRadius = '8px';
+      canvas.style.maxWidth = '100%';
+      canvas.style.maxHeight = '100%';
+      mainChartRef.current.appendChild(canvas);
+    } else {
+      console.log('♻️ [DualChart] Reusing existing main canvas');
+    }
+    
     // 親要素の実際の内部サイズを取得
     const containerRect = mainChartRef.current.getBoundingClientRect();
     const containerWidth = Math.max(containerRect.width, 300); // 最小幅を保証
     const containerHeight = isMobile ? 300 : 460;
     
+    console.log('📐 [DualChart] Canvas dimensions', {
+      canvasExists,
+      containerWidth,
+      containerHeight,
+      isMobile,
+      rectWidth: containerRect.width,
+      rectHeight: containerRect.height
+    });
+    
     canvas.width = containerWidth;
     canvas.height = containerHeight;
-    canvas.style.background = '#1e1e1e';
-    canvas.style.borderRadius = '8px';
-    canvas.style.maxWidth = '100%';
-    canvas.style.maxHeight = '100%';
-    
-    mainChartRef.current.innerHTML = '';
-    mainChartRef.current.appendChild(canvas);
     
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    if (!ctx) {
+      console.error('❌ [DualChart] Failed to get 2D context');
+      return;
+    }
 
     // 価格範囲計算
     const allPrices = mainData.flatMap(d => [d.open, d.high, d.low, d.close]);
     const minPrice = Math.min(...allPrices);
     const maxPrice = Math.max(...allPrices);
+    
+    console.log('💹 [DualChart] Price data analysis', {
+      dataCount: mainData.length,
+      minPrice,
+      maxPrice,
+      priceRange: maxPrice - minPrice,
+      sampleData: mainData.slice(0, 2)
+    });
     const priceRange = maxPrice - minPrice;
     const padding = priceRange * 0.1;
 
@@ -162,6 +210,12 @@ const DualChart: React.FC<DualChartProps> = ({
     }
 
     // ローソク足描画（レスポンシブ対応）
+    console.log('🕯️ [DualChart] Starting candlestick drawing', {
+      candleCount: mainData.length,
+      candleWidth,
+      chartArea: { chartLeft, chartRight, chartTop, chartBottom, chartWidth, chartHeight }
+    });
+    
     mainData.forEach((candle, index) => {
       const x = chartLeft + (index + 0.5) * candleWidth;
       const bodyWidth = candleWidth * (isMobile ? 0.8 : 0.7);
@@ -218,16 +272,21 @@ const DualChart: React.FC<DualChartProps> = ({
       ctx.fillText(price.toFixed(3), chartLeft - 10, y + 4);
     }
 
-    // 時間軸ラベル（最新5本分、レスポンシブフォント）
+    // 時間軸ラベル（全20本を4本間隔で表示、レスポンシブフォント）
     ctx.fillStyle = '#ffffff';
     ctx.font = `${isMobile ? 8 : 10}px Arial`;
     ctx.textAlign = 'center';
     
-    const timeLabels = mainData.slice(-5);
-    timeLabels.forEach((candle, idx) => {
-      const x = chartLeft + (mainData.length - 5 + idx + 0.5) * candleWidth;
+    // 全20本のローソク足に時間ラベルを表示
+    mainData.forEach((candle, idx) => {
+      const x = chartLeft + (idx + 0.5) * candleWidth;
       const time = new Date(typeof candle.time === 'string' ? candle.time : candle.time * 1000);
       const timeStr = `${time.getHours().toString().padStart(2, '0')}:${time.getMinutes().toString().padStart(2, '0')}`;
+      
+      if (idx < 3) {
+        console.log(`🕐 [15分足表示${idx}] candle.time:${candle.time} → Date:${time.toLocaleString('ja-JP')} → 表示:${timeStr}`);
+      }
+      
       ctx.fillText(timeStr, x, chartBottom + 15);
     });
 
@@ -240,9 +299,33 @@ const DualChart: React.FC<DualChartProps> = ({
 
   // 5分足詳細チャート描画
   const drawDetailChart = () => {
-    if (!detailChartRef.current || detailData.length === 0) return;
+    console.log('📊 [DualChart] drawDetailChart called', {
+      hasRef: !!detailChartRef.current,
+      detailDataLength: detailData.length,
+      expectedLength: 20,
+      actualData: detailData.length > 0 ? `First: ${new Date(detailData[0].time).toLocaleTimeString()}, Last: ${new Date(detailData[detailData.length-1].time).toLocaleTimeString()}` : 'No data',
+      timestamp: new Date().toISOString()
+    });
     
-    const canvas = document.createElement('canvas');
+    if (!detailChartRef.current || detailData.length === 0) {
+      console.warn('❌ [DualChart] Cannot draw detail chart', {
+        hasRef: !!detailChartRef.current,
+        detailDataLength: detailData.length
+      });
+      return;
+    }
+    
+    // 既存のcanvasを再利用または新規作成
+    let canvas = detailChartRef.current.querySelector('canvas') as HTMLCanvasElement;
+    if (!canvas) {
+      canvas = document.createElement('canvas');
+      canvas.style.background = '#1e1e1e';
+      canvas.style.borderRadius = '8px';
+      canvas.style.maxWidth = '100%';
+      canvas.style.maxHeight = '100%';
+      detailChartRef.current.appendChild(canvas);
+    }
+    
     // 親要素の実際の内部サイズを取得
     const containerRect = detailChartRef.current.getBoundingClientRect();
     const containerWidth = Math.max(containerRect.width, 200); // 最小幅を保証
@@ -250,13 +333,6 @@ const DualChart: React.FC<DualChartProps> = ({
     
     canvas.width = containerWidth;
     canvas.height = containerHeight;
-    canvas.style.background = '#1e1e1e';
-    canvas.style.borderRadius = '8px';
-    canvas.style.maxWidth = '100%';
-    canvas.style.maxHeight = '100%';
-    
-    detailChartRef.current.innerHTML = '';
-    detailChartRef.current.appendChild(canvas);
     
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -371,16 +447,21 @@ const DualChart: React.FC<DualChartProps> = ({
       ctx.fillText(price.toFixed(3), chartLeft - 5, y + 3);
     }
 
-    // 時間軸ラベル（最新3本分、レスポンシブフォント）
+    // 時間軸ラベル（全12本をすべて表示、レスポンシブフォント）
     ctx.fillStyle = '#ffffff';
-    ctx.font = `${isMobile ? 7 : 9}px Arial`;
+    ctx.font = `${isMobile ? 6 : 8}px Arial`;
     ctx.textAlign = 'center';
     
-    const timeLabels = detailData.slice(-3);
-    timeLabels.forEach((candle, idx) => {
-      const x = chartLeft + (detailData.length - 3 + idx + 0.5) * candleWidth;
+    // 全12本のローソク足に時間ラベルを表示
+    detailData.forEach((candle, idx) => {
+      const x = chartLeft + (idx + 0.5) * candleWidth;
       const time = new Date(typeof candle.time === 'string' ? candle.time : candle.time * 1000);
       const timeStr = `${time.getHours().toString().padStart(2, '0')}:${time.getMinutes().toString().padStart(2, '0')}`;
+      
+      if (idx % 3 === 0) {
+        console.log(`🕐 [5分足表示${idx}] candle.time:${candle.time} → Date:${time.toLocaleString('ja-JP')} → 表示:${timeStr}`);
+      }
+      
       ctx.fillText(timeStr, x, chartBottom + 15);
     });
 
@@ -392,15 +473,26 @@ const DualChart: React.FC<DualChartProps> = ({
   };
 
   useEffect(() => {
+    console.log('🔄 [DualChart] useEffect triggered', {
+      mainDataLength: mainData.length,
+      torbRange: !!torbRange,
+      isMobile,
+      reason: 'mainData, torbRange, or isMobile changed'
+    });
+    
     const timer = setTimeout(() => {
-      drawMainChart();
+      if (mainData.length > 0) {
+        drawMainChart();
+      }
     }, 50);
     return () => clearTimeout(timer);
   }, [mainData, torbRange, isMobile]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      drawDetailChart();
+      if (detailData.length > 0) {
+        drawDetailChart();
+      }
     }, 50);
     return () => clearTimeout(timer);
   }, [detailData, isMobile]);
