@@ -621,7 +621,7 @@ const TradingPage: React.FC = () => {
     // 🚨 GMOコインAPIのみを使用 - 5分足データ取得
     const fetch5MinDataOnce = async () => {
       console.log('🔄 [GMO ONLY] GMOコインAPIから5分足データを取得中... (修正版)');
-      const candleData = await fxApiService.getHistoricalData('USDJPY', '5m', 5);
+      const candleData = await fxApiService.getHistoricalData('USDJPY', '5m', 7);
       
       console.log('✅ [GMO API] 5分足データを取得しました:', candleData.length + '本');
       console.log('📋 [DEBUG] Raw candle data sample:', candleData.slice(0, 3));
