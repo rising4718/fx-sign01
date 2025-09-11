@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Layout, Card, Form, Input, Button, Tabs, Typography, Space, Divider, Alert } from 'antd';
 import { UserOutlined, MailOutlined, LockOutlined, LoginOutlined, UserAddOutlined } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -23,12 +23,24 @@ interface RegisterFormData {
 const LoginPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState('login');
   const [isLoading, setIsLoading] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const { login, register } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   // リダイレクト先を取得（デフォルトはホーム）
   const from = (location.state as any)?.from?.pathname || '/';
+
+  // レスポンシブ監視
+  useEffect(() => {
+    const checkDevice = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkDevice();
+    window.addEventListener('resize', checkDevice);
+    return () => window.removeEventListener('resize', checkDevice);
+  }, []);
 
   // ログイン処理
   const handleLogin = async (values: LoginFormData) => {
@@ -63,19 +75,21 @@ const LoginPage: React.FC = () => {
       <Content style={{ 
         display: 'flex', 
         justifyContent: 'center', 
-        alignItems: 'center', 
-        padding: '50px 24px',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+        alignItems: isMobile ? 'flex-start' : 'center', 
+        padding: isMobile ? '20px 16px' : '50px 24px',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        minHeight: isMobile ? 'calc(100vh - 48px)' : 'calc(100vh - 36px)',
+        paddingTop: isMobile ? '60px' : '50px'
       }}>
-        <div style={{ width: '100%', maxWidth: '400px' }}>
+        <div style={{ width: '100%', maxWidth: isMobile ? '350px' : '400px' }}>
           {/* サービス紹介部分 */}
-          <div style={{ textAlign: 'center', marginBottom: '32px', color: 'white' }}>
-            <Title level={2} style={{ color: 'white', marginBottom: '8px' }}>
+          <div style={{ textAlign: 'center', marginBottom: isMobile ? '24px' : '32px', color: 'white' }}>
+            <Title level={isMobile ? 3 : 2} style={{ color: 'white', marginBottom: '8px', fontSize: isMobile ? '20px' : undefined }}>
               FX Pattern Analyzer
             </Title>
-            <Paragraph style={{ color: 'rgba(255,255,255,0.9)', fontSize: '16px' }}>
-              東京ボックス・ブレイクアウト戦略<br />
-              <strong>勝率75.7%実績</strong>の高性能サインツール
+            <Paragraph style={{ color: 'rgba(255,255,255,0.9)', fontSize: isMobile ? '14px' : '16px', lineHeight: isMobile ? '1.4' : '1.6' }}>
+              東京ボックス・ブレイクアウト戦略{isMobile ? '' : <br />}
+              {isMobile && ' - '}<strong>勝率75.7%実績</strong>の高性能サインツール
             </Paragraph>
           </div>
 
@@ -283,26 +297,26 @@ const LoginPage: React.FC = () => {
 
           {/* 機能紹介 */}
           <div style={{ 
-            marginTop: '32px', 
-            padding: '24px', 
+            marginTop: isMobile ? '24px' : '32px', 
+            padding: isMobile ? '16px' : '24px', 
             background: 'rgba(255,255,255,0.1)', 
             borderRadius: '12px',
             color: 'white'
           }}>
-            <Title level={4} style={{ color: 'white', textAlign: 'center' }}>
+            <Title level={isMobile ? 5 : 4} style={{ color: 'white', textAlign: 'center', fontSize: isMobile ? '16px' : undefined, marginBottom: isMobile ? '12px' : undefined }}>
               🎯 Phase 1 提供機能
             </Title>
-            <Space direction="vertical" size="small" style={{ width: '100%' }}>
-              <Text style={{ color: 'rgba(255,255,255,0.9)' }}>
+            <Space direction="vertical" size={isMobile ? 8 : "small"} style={{ width: '100%' }}>
+              <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: isMobile ? '12px' : '14px' }}>
                 ✅ パフォーマンスダッシュボード
               </Text>
-              <Text style={{ color: 'rgba(255,255,255,0.9)' }}>
+              <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: isMobile ? '12px' : '14px' }}>
                 ✅ TORB戦略シグナル
               </Text>
-              <Text style={{ color: 'rgba(255,255,255,0.9)' }}>
+              <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: isMobile ? '12px' : '14px' }}>
                 ✅ 30日間データ履歴
               </Text>
-              <Text style={{ color: 'rgba(255,255,255,0.9)' }}>
+              <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: isMobile ? '12px' : '14px' }}>
                 ✅ リアルタイム実績公開
               </Text>
             </Space>
